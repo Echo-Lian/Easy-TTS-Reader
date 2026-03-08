@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' http://localhost:11434">
+  <title>Easy TTS Reader</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-content">
+        <h1>Easy TTS Reader</h1>
+        <p class="subtitle">AI-Powered Text-to-Speech Desktop Application</p>
+      </div>
+      <div class="header-actions">
+        <button id="open-text-btn" class="icon-btn" title="Open Text File (Ctrl+O)">
+          📄 Open Text
+        </button>
+        <button id="open-image-btn" class="icon-btn" title="Open Image with OCR (Ctrl+Shift+O)">
+          🖼️ Open Image
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <!-- Text Editor Section -->
+      <section class="editor-section">
+        <div class="section-header">
+          <h2>Text Content</h2>
+          <div class="editor-actions">
+            <button id="clear-text-btn" class="small-btn">Clear</button>
+            <button id="paste-btn" class="small-btn">Paste</button>
+          </div>
+        </div>
+        <textarea id="text-input" placeholder="Enter or paste text here, or open a file..."></textarea>
+        <div class="text-stats">
+          <span id="char-count">0 characters</span>
+          <span id="word-count">0 words</span>
+        </div>
+      </section>
+
+      <!-- Controls Section -->
+      <section class="controls-section">
+        <h2>Voice Settings</h2>
+
+        <div class="control-group">
+          <label for="speed">
+            Speed: <span id="speed-value">1.0</span>x
+          </label>
+          <input type="range" id="speed" min="0.5" max="2.0" step="0.1" value="1.0">
+        </div>
+
+        <div class="control-group">
+          <label for="pitch">
+            Pitch: <span id="pitch-value">1.0</span>
+          </label>
+          <input type="range" id="pitch" min="0.5" max="2.0" step="0.1" value="1.0">
+        </div>
+
+        <div class="control-group">
+          <label for="volume">
+            Volume: <span id="volume-value">1.0</span>
+          </label>
+          <input type="range" id="volume" min="0" max="1.0" step="0.1" value="1.0">
+        </div>
+
+        <div class="control-group">
+          <label for="language">Language:</label>
+          <select id="language">
+            <option value="en-US" selected>English (US)</option>
+            <option value="en-GB">English (UK)</option>
+            <option value="es-ES">Spanish</option>
+            <option value="fr-FR">French</option>
+            <option value="de-DE">German</option>
+            <option value="it-IT">Italian</option>
+            <option value="ja-JP">Japanese</option>
+            <option value="zh-CN">Chinese</option>
+            <option value="ko-KR">Korean</option>
+            <option value="ru-RU">Russian</option>
+          </select>
+        </div>
+
+        <div class="checkbox-group">
+          <label>
+            <input type="checkbox" id="ai-enhance">
+            Enhance with AI (Ollama)
+          </label>
+        </div>
+
+        <!-- Batch Processing -->
+        <div class="batch-section">
+          <h3>Batch Processing</h3>
+          <button id="add-batch-btn" class="secondary-btn">Add Multiple Files</button>
+          <div id="batch-list" class="batch-list"></div>
+          <button id="process-batch-btn" class="secondary-btn" disabled>Process Batch</button>
+        </div>
+      </section>
+    </main>
+
+    <!-- Action Bar -->
+    <footer class="action-bar">
+      <div class="status-info">
+        <p id="status-message"></p>
+        <p id="cache-info" class="small-text"></p>
+      </div>
+      <div class="action-buttons">
+        <button id="speak-btn" class="primary-btn large-btn">
+          🔊 Speak
+        </button>
+        <button id="stop-btn" class="danger-btn large-btn">
+          ⏹️ Stop
+        </button>
+        <button id="export-btn" class="secondary-btn">
+          💾 Export Audio
+        </button>
+        <button id="clear-cache-btn" class="secondary-btn">
+          🗑️ Clear Cache
+        </button>
+      </div>
+    </footer>
+  </div>
+
+  <script src="../../shared/tts-service.js"></script>
+  <script src="../../shared/storage-adapter.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

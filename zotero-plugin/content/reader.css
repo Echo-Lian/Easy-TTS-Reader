@@ -1,0 +1,180 @@
+/* Styles for Zotero TTS Reader Window */
+
+.container {
+  background: #ffffff;
+}
+
+.header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 16px;
+}
+
+.title {
+  font-size: 18px;
+  font-weight: bold;
+  margin-bottom: 4px;
+}
+
+.subtitle {
+  font-size: 11px;
+  opacity: 0.9;
+}
+
+.content {
+  padding: 16px;
+  overflow: auto;
+}
+
+.section {
+  margin-bottom: 16px;
+}
+
+.section-label {
+  font-weight: bold;
+  font-size: 12px;
+  margin-bottom: 6px;
+  color: #333;
+}
+
+.text-input {
+  min-height: 120px;
+  font-family: monospace;
+  margin-bottom: 8px;
+}
+
+.controls {
+  background: #f5f5f5;
+  padding: 12px;
+  border-radius: 4px;
+}
+
+.control-row {
+  margin-bottom: 10px;
+}
+
+.control-row:last-child {
+  margin-bottom: 0;
+}
+
+.control-label {
+  width: 80px;
+  font-size: 12px;
+}
+
+.value-label {
+  width: 40px;
+  text-align: right;
+  font-size: 12px;
+  color: #666;
+}
+
+.button-group {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+button {
+  padding: 6px 12px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.primary-btn {
+  background: #667eea;
+  color: white;
+  border-color: #667eea;
+}
+
+.primary-btn:hover {
+  background: #5568d3;
+}
+
+.danger-btn {
+  background: #f56565;
+  color: white;
+  border-color: #f56565;
+}
+
+.danger-btn:hover {
+  background: #e53e3e;
+}
+
+.secondary-btn {
+  background: #f0f0f0;
+  color: #333;
+}
+
+.secondary-btn:hover {
+  background: #e0e0e0;
+}
+
+.link-btn {
+  background: transparent;
+  border: none;
+  color: #667eea;
+  text-decoration: underline;
+}
+
+.link-btn:hover {
+  color: #5568d3;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.status-area {
+  min-height: 50px;
+  margin-top: 12px;
+}
+
+.status-message {
+  padding: 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  text-align: center;
+}
+
+.status-info {
+  background: #bee3f8;
+  color: #2c5282;
+}
+
+.status-success {
+  background: #c6f6d5;
+  color: #22543d;
+}
+
+.status-error {
+  background: #fed7d7;
+  color: #742a2a;
+}
+
+.status-warning {
+  background: #feebc8;
+  color: #7c2d12;
+}
+
+.cache-info {
+  font-size: 11px;
+  color: #718096;
+  text-align: center;
+  margin-top: 4px;
+}
+
+.footer {
+  padding: 12px 16px;
+  background: #f5f5f5;
+  border-top: 1px solid #e0e0e0;
+}
+
+.footer-text {
+  font-size: 11px;
+  color: #718096;
+}

@@ -1,0 +1,24 @@
+{
+  "manifest_version": 2,
+  "name": "Easy TTS Reader for Zotero",
+  "version": "1.0.0",
+  "description": "AI-powered Text-to-Speech reader for Zotero with Ollama",
+  "author": "",
+  "homepage_url": "https://github.com/your-username/easy-tts-reader",
+  "icons": {
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "64": "icons/icon64.png"
+  },
+  "applications": {
+    "zotero": {
+      "id": "easytts@zotero",
+      "update_url": "",
+      "strict_min_version": "6.0",
+      "strict_max_version": "7.*"
+    }
+  },
+  "background": {
+    "scripts": ["bootstrap.js"]
+  }
+}

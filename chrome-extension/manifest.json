@@ -1,0 +1,44 @@
+{
+  "manifest_version": 3,
+  "name": "Easy TTS Reader",
+  "version": "1.0.0",
+  "description": "Free AI-powered Text-to-Speech reader with Ollama",
+  "permissions": [
+    "storage",
+    "activeTab",
+    "contextMenus",
+    "tts"
+  ],
+  "host_permissions": [
+    "http://localhost:11434/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "css": ["content.css"]
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["shared/*"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}

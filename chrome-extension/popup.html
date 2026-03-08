@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Easy TTS Reader</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Easy TTS Reader</h1>
+      <p class="subtitle">AI-Powered Text-to-Speech</p>
+    </header>
+
+    <main>
+      <div class="input-section">
+        <label for="text-input">Text to Convert:</label>
+        <textarea id="text-input" placeholder="Enter text or select text on the page and right-click..."></textarea>
+        <button id="get-selection-btn" class="secondary-btn">Get Selected Text</button>
+      </div>
+
+      <div class="controls">
+        <div class="control-group">
+          <label for="speed">Speed: <span id="speed-value">1.0</span></label>
+          <input type="range" id="speed" min="0.5" max="2.0" step="0.1" value="1.0">
+        </div>
+
+        <div class="control-group">
+          <label for="pitch">Pitch: <span id="pitch-value">1.0</span></label>
+          <input type="range" id="pitch" min="0.5" max="2.0" step="0.1" value="1.0">
+        </div>
+
+        <div class="control-group">
+          <label for="volume">Volume: <span id="volume-value">1.0</span></label>
+          <input type="range" id="volume" min="0" max="1.0" step="0.1" value="1.0">
+        </div>
+
+        <div class="control-group">
+          <label for="language">Language:</label>
+          <select id="language">
+            <option value="en-US">English (US)</option>
+            <option value="en-GB">English (UK)</option>
+            <option value="es-ES">Spanish</option>
+            <option value="fr-FR">French</option>
+            <option value="de-DE">German</option>
+            <option value="it-IT">Italian</option>
+            <option value="ja-JP">Japanese</option>
+            <option value="zh-CN">Chinese</option>
+          </select>
+        </div>
+
+        <div class="control-group">
+          <label>
+            <input type="checkbox" id="ai-enhance">
+            Enhance with AI (Ollama)
+          </label>
+        </div>
+      </div>
+
+      <div class="action-buttons">
+        <button id="speak-btn" class="primary-btn">Speak</button>
+        <button id="stop-btn" class="danger-btn">Stop</button>
+        <button id="clear-cache-btn" class="secondary-btn">Clear Cache</button>
+      </div>
+
+      <div class="status">
+        <p id="status-message"></p>
+        <p id="cache-info" class="small-text"></p>
+      </div>
+    </main>
+
+    <footer>
+      <button id="settings-btn" class="link-btn">Settings</button>
+      <span class="small-text">Powered by Ollama</span>
+    </footer>
+  </div>
+
+  <script src="../shared/tts-service.js"></script>
+  <script src="../shared/storage-adapter.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

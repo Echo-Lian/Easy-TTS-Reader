@@ -1,0 +1,108 @@
+<?xml version="1.0"?>
+<?xml-stylesheet href="chrome://global/skin/" type="text/css"?>
+<?xml-stylesheet href="reader.css" type="text/css"?>
+
+<window xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+        id="easytts-reader-window"
+        title="Easy TTS Reader"
+        width="500"
+        height="600"
+        persist="screenX screenY width height">
+
+  <script src="../shared/tts-service.js"/>
+  <script src="../shared/storage-adapter.js"/>
+  <script src="reader.js"/>
+
+  <vbox flex="1" class="container">
+    <!-- Header -->
+    <hbox class="header">
+      <vbox flex="1">
+        <label value="Easy TTS Reader" class="title"/>
+        <label value="AI-Powered Text-to-Speech" class="subtitle"/>
+      </vbox>
+    </hbox>
+
+    <!-- Main content -->
+    <vbox flex="1" class="content">
+      <!-- Text input -->
+      <vbox class="section">
+        <label value="Text to Convert:" class="section-label"/>
+        <textbox id="text-input"
+                 multiline="true"
+                 flex="1"
+                 placeholder="Enter text or select an item in Zotero..."
+                 class="text-input"/>
+
+        <hbox class="button-group">
+          <button id="load-abstract-btn"
+                  label="Load Selected Abstract"
+                  class="secondary-btn"/>
+          <button id="load-notes-btn"
+                  label="Load Selected Notes"
+                  class="secondary-btn"/>
+        </hbox>
+      </vbox>
+
+      <!-- Controls -->
+      <vbox class="section controls">
+        <label value="Voice Settings" class="section-label"/>
+
+        <hbox align="center" class="control-row">
+          <label value="Speed:" class="control-label"/>
+          <scale id="speed-slider" min="0.5" max="2.0" increment="0.1" value="1.0" flex="1"/>
+          <label id="speed-value" value="1.0" class="value-label"/>
+        </hbox>
+
+        <hbox align="center" class="control-row">
+          <label value="Pitch:" class="control-label"/>
+          <scale id="pitch-slider" min="0.5" max="2.0" increment="0.1" value="1.0" flex="1"/>
+          <label id="pitch-value" value="1.0" class="value-label"/>
+        </hbox>
+
+        <hbox align="center" class="control-row">
+          <label value="Volume:" class="control-label"/>
+          <scale id="volume-slider" min="0" max="1.0" increment="0.1" value="1.0" flex="1"/>
+          <label id="volume-value" value="1.0" class="value-label"/>
+        </hbox>
+
+        <hbox align="center" class="control-row">
+          <label value="Language:" class="control-label"/>
+          <menulist id="language-select" flex="1">
+            <menupopup>
+              <menuitem label="English (US)" value="en-US" selected="true"/>
+              <menuitem label="English (UK)" value="en-GB"/>
+              <menuitem label="Spanish" value="es-ES"/>
+              <menuitem label="French" value="fr-FR"/>
+              <menuitem label="German" value="de-DE"/>
+              <menuitem label="Italian" value="it-IT"/>
+              <menuitem label="Japanese" value="ja-JP"/>
+              <menuitem label="Chinese" value="zh-CN"/>
+            </menupopup>
+          </menulist>
+        </hbox>
+
+        <checkbox id="ai-enhance" label="Enhance with AI (Ollama)"/>
+      </vbox>
+
+      <!-- Action buttons -->
+      <hbox class="button-group">
+        <button id="speak-btn" label="Speak" class="primary-btn" flex="1"/>
+        <button id="stop-btn" label="Stop" class="danger-btn"/>
+        <button id="clear-cache-btn" label="Clear Cache" class="secondary-btn"/>
+      </hbox>
+
+      <!-- Status -->
+      <vbox class="status-area">
+        <label id="status-message" class="status-message"/>
+        <label id="cache-info" class="cache-info"/>
+      </vbox>
+    </vbox>
+
+    <!-- Footer -->
+    <hbox class="footer">
+      <label value="Powered by Ollama" class="footer-text"/>
+      <spacer flex="1"/>
+      <button id="settings-btn" label="Settings" class="link-btn"/>
+    </hbox>
+  </vbox>
+</window>
