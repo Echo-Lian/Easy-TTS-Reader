@@ -40,7 +40,7 @@ A free, AI-powered Text-to-Speech (TTS) reader built with offline LLM Ollama. Co
    ```
 
 3. Load in Chrome:
-   - Open `chrome://extensions/`
+   - Open `chrome://extensions/manage extensions`
    - Enable "Developer mode" (top right)
    - Click "Load unpacked"
    - Select the `dist/chrome-extension` folder
