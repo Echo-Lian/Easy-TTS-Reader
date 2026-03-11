@@ -10,7 +10,7 @@ const sharedDir = path.join(__dirname, '../shared');
 const outputDir = path.join(__dirname, '../dist/chrome-extension');
 
 /**
- * Generate icon using canvas
+ * Generate icon using canvas - matches the logic from generate-icons.html
  */
 function generateIcon(size) {
   // Try to use canvas package if available, otherwise fall back to placeholder
@@ -26,25 +26,45 @@ function generateIcon(size) {
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, size, size);
 
-    // Draw the 'T' letter
+    // Draw speaker icon
     ctx.fillStyle = 'white';
-    const fontSize = Math.floor(size * 0.55);
-    ctx.font = `bold ${fontSize}px Arial, sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('T', size / 2, size / 2);
 
-    // Add a subtle sound wave indicator in the corner
-    const cornerSize = size * 0.2;
-    const cornerX = size - cornerSize * 1.5;
-    const cornerY = cornerSize;
+    // Calculate scaling
+    const centerX = size / 2;
+    const centerY = size / 2;
+    const scale = size / 100;
 
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-    for (let i = 0; i < 3; i++) {
-      ctx.beginPath();
-      ctx.arc(cornerX + i * cornerSize * 0.3, cornerY, cornerSize * 0.15, 0, 2 * Math.PI);
-      ctx.fill();
-    }
+    // Draw speaker body (trapezoid/cone)
+    ctx.beginPath();
+    ctx.moveTo(centerX - 20 * scale, centerY - 15 * scale);
+    ctx.lineTo(centerX - 20 * scale, centerY + 15 * scale);
+    ctx.lineTo(centerX - 5 * scale, centerY + 10 * scale);
+    ctx.lineTo(centerX - 5 * scale, centerY - 10 * scale);
+    ctx.closePath();
+    ctx.fill();
+
+    // Draw speaker box
+    ctx.fillRect(centerX - 30 * scale, centerY - 10 * scale, 10 * scale, 20 * scale);
+
+    // Draw sound waves
+    ctx.strokeStyle = 'white';
+    ctx.lineCap = 'round';
+    ctx.lineWidth = Math.max(2, size / 32);
+
+    // Small wave
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, 15 * scale, -Math.PI / 4, Math.PI / 4, false);
+    ctx.stroke();
+
+    // Medium wave
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, 25 * scale, -Math.PI / 4, Math.PI / 4, false);
+    ctx.stroke();
+
+    // Large wave
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, 35 * scale, -Math.PI / 4, Math.PI / 4, false);
+    ctx.stroke();
 
     return canvas.toBuffer('image/png');
   } catch (error) {

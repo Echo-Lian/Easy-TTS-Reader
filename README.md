@@ -38,6 +38,11 @@ A free, AI-powered Text-to-Speech (TTS) reader built with offline LLM Ollama. Co
    ```bash
    npm run build:chrome
    ```
+   check if the icons are generated in `dist/chrome-extension/icons/`. If not, run:
+   ```bash
+   npm install canvas
+   ```
+   Then run the build command again.
 
 3. Load in Chrome:
    - Open `chrome://extensions/manage extensions`
@@ -199,6 +204,7 @@ Easy-TTS-Reader/
 │   ├── popup.html/js/css
 │   ├── background.js
 │   └── content.js
+│   └── generate-icons.html
 ├── zotero-plugin/        # Zotero plugin source
 │   ├── manifest.json
 │   ├── bootstrap.js
