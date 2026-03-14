@@ -23,7 +23,6 @@ A free, AI-powered Text-to-Speech (TTS) reader built with offline LLM Ollama. Co
 
 1. **Node.js** (v16 or higher) - [Download here](https://nodejs.org/)
 2. **Ollama** (optional, for AI enhancement) - [Download here](https://ollama.ai/)
-   - After installing Ollama, run: `ollama pull llama2`
 
 ## Installation
 

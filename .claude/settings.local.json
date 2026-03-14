@@ -5,7 +5,8 @@
       "Bash(lsof:*)",
       "Bash(ollama list:*)",
       "Bash(node:*)",
-      "Bash(npm run build:chrome:*)"
+      "Bash(npm run build:chrome:*)",
+      "Bash(cat:*)"
     ],
     "deny": [],
     "ask": []
