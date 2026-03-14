@@ -104,37 +104,105 @@ async function generateIcons() {
 
 async function build() {
   try {
+    console.log('========================================');
     console.log('Building Chrome Extension...');
+    console.log('========================================\n');
 
     // Clean output directory
+    console.log('Step 1: Cleaning output directory...');
     await fs.remove(outputDir);
     await fs.ensureDir(outputDir);
+    console.log('  ✓ Output directory cleaned\n');
 
     // Copy extension files
+    console.log('Step 2: Copying extension files...');
     await fs.copy(sourceDir, outputDir, {
       filter: (src) => {
         // Exclude generate-icons.html from the build output
         return !src.endsWith('generate-icons.html');
       }
     });
+    console.log('  ✓ manifest.json');
+    console.log('  ✓ background.js');
+    console.log('  ✓ content.js');
+    console.log('  ✓ content.css');
+    console.log('  ✓ popup.html');
+    console.log('  ✓ popup.js');
+    console.log('  ✓ popup.css\n');
 
     // Copy shared files
+    console.log('Step 3: Copying shared files...');
     const sharedOutputDir = path.join(outputDir, 'shared');
     await fs.ensureDir(sharedOutputDir);
     await fs.copy(sharedDir, sharedOutputDir);
+    console.log('  ✓ shared/ollama-client.js');
+    console.log('  ✓ shared/tts-service.js');
+    console.log('  ✓ shared/storage-adapter.js\n');
 
     // Generate icons
+    console.log('Step 4: Generating icons...');
     await generateIcons();
+    console.log('');
 
-    console.log('\nChrome Extension built successfully!');
-    console.log(`Output: ${outputDir}`);
-    console.log('\nTo load in Chrome:');
-    console.log('1. Open chrome://extensions/');
-    console.log('2. Enable "Developer mode"');
-    console.log('3. Click "Load unpacked"');
-    console.log(`4. Select: ${outputDir}`);
+    // Verify build
+    console.log('Step 5: Verifying build...');
+    const requiredFiles = [
+      'manifest.json',
+      'background.js',
+      'content.js',
+      'popup.html',
+      'popup.js',
+      'shared/ollama-client.js',
+      'shared/tts-service.js',
+      'shared/storage-adapter.js'
+    ];
+
+    let allFilesPresent = true;
+    for (const file of requiredFiles) {
+      const filePath = path.join(outputDir, file);
+      if (await fs.pathExists(filePath)) {
+        console.log(`  ✓ ${file}`);
+      } else {
+        console.log(`  ✗ ${file} - MISSING!`);
+        allFilesPresent = false;
+      }
+    }
+
+    if (!allFilesPresent) {
+      throw new Error('Some required files are missing from the build!');
+    }
+
+    console.log('\n========================================');
+    console.log('✓ Chrome Extension built successfully!');
+    console.log('========================================\n');
+    console.log(`Build output: ${outputDir}\n`);
+    console.log('Next steps:');
+    console.log('1. Start the local server:');
+    console.log('   npm run start:server');
+    console.log('');
+    console.log('2. Load extension in Chrome:');
+    console.log('   a. Open chrome://extensions/');
+    console.log('   b. Enable "Developer mode" (top right)');
+    console.log('   c. Click "Load unpacked"');
+    console.log(`   d. Select: ${outputDir}`);
+    console.log('');
+    console.log('3. If updating existing extension:');
+    console.log('   a. Go to chrome://extensions/');
+    console.log('   b. Find "Easy TTS Reader"');
+    console.log('   c. Click the reload icon (🔄)');
+    console.log('');
+    console.log('4. Test the AI features:');
+    console.log('   - Select text on any webpage');
+    console.log('   - Right-click → "Read with natural AI voice"');
+    console.log('   - Or use the popup and check "Enhance with AI (Ollama)"');
+    console.log('');
+    console.log('Make sure Ollama is running with qwen2:7b model:');
+    console.log('   ollama pull qwen2:7b');
+    console.log('   ollama serve');
+    console.log('========================================\n');
   } catch (error) {
-    console.error('Build failed:', error);
+    console.error('\n❌ Build failed:', error.message);
+    console.error(error);
     process.exit(1);
   }
 }

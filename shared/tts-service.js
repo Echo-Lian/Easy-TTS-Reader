@@ -3,18 +3,37 @@
  * This service is used across Chrome Extension, Zotero Plugin, and Desktop App
  */
 
+// Import OllamaClient if available
+let OllamaClient;
+if (typeof require !== 'undefined') {
+  try {
+    OllamaClient = require('./ollama-client');
+  } catch (e) {
+    // Will be loaded via script tag in browser
+  }
+}
+
 class TTSService {
-  constructor(ollamaUrl = 'http://localhost:11434') {
+  constructor(ollamaUrl = 'http://localhost:11434', model = 'qwen2:7b') {
     this.ollamaUrl = ollamaUrl;
     this.cache = new Map();
     this.preferences = {
-      model: 'llama2',
+      model: model,
       voice: 'default',
       pitch: 1.0,
       speed: 1.0,
       volume: 1.0,
       language: 'en-US'
     };
+
+    // Initialize Ollama client for desktop and Zotero
+    if (OllamaClient || (typeof window !== 'undefined' && window.OllamaClient)) {
+      const Client = OllamaClient || window.OllamaClient;
+      this.ollamaClient = new Client({
+        baseUrl: ollamaUrl,
+        defaultModel: this.preferences.model
+      });
+    }
   }
 
   /**
@@ -47,6 +66,11 @@ class TTSService {
    */
   updatePreferences(newPrefs) {
     this.preferences = { ...this.preferences, ...newPrefs };
+
+    // Update Ollama client model if changed
+    if (this.ollamaClient && newPrefs.model) {
+      this.ollamaClient.setDefaultModel(newPrefs.model);
+    }
   }
 
   /**
@@ -119,9 +143,19 @@ class TTSService {
 
   /**
    * Enhance text using Ollama AI before TTS
+   * Uses shared OllamaClient for consistent behavior across platforms
    */
   async enhanceTextWithAI(text) {
     try {
+      // Use shared Ollama client if available (desktop, Zotero)
+      if (this.ollamaClient) {
+        const result = await this.ollamaClient.enhanceForSpeech(text, {
+          model: this.preferences.model
+        });
+        return result.enhanced;
+      }
+
+      // Fallback to direct fetch for compatibility
       const response = await fetch(`${this.ollamaUrl}/api/generate`, {
         method: 'POST',
         headers: {
@@ -143,6 +177,28 @@ class TTSService {
     } catch (error) {
       console.warn('AI enhancement failed, using original text:', error);
       return text;
+    }
+  }
+
+  /**
+   * Summarize text using Ollama AI
+   * Uses shared OllamaClient for consistent behavior across platforms
+   */
+  async summarizeText(text, maxLength = 500) {
+    try {
+      if (this.ollamaClient) {
+        const result = await this.ollamaClient.summarize(text, {
+          model: this.preferences.model,
+          maxLength: maxLength
+        });
+        return result.summary;
+      }
+
+      // Fallback for environments without OllamaClient
+      throw new Error('Summarization requires OllamaClient or server endpoint');
+    } catch (error) {
+      console.error('Summarization failed:', error);
+      throw error;
     }
   }
 

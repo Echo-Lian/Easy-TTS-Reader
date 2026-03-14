@@ -35,6 +35,26 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     sendResponse({ success: true });
   }
 
+  if (request.action === 'enhanceAndSpeak') {
+    const selectedText = window.getSelection().toString();
+    if (selectedText) {
+      handleEnhanceAndSpeak(selectedText);
+      sendResponse({ success: true });
+    } else {
+      sendResponse({ success: false, error: 'No text selected' });
+    }
+  }
+
+  if (request.action === 'summarizeAndSpeak') {
+    const selectedText = window.getSelection().toString();
+    if (selectedText) {
+      handleSummarizeAndSpeak(selectedText);
+      sendResponse({ success: true });
+    } else {
+      sendResponse({ success: false, error: 'No text selected' });
+    }
+  }
+
   return true;
 });
 
@@ -98,9 +118,113 @@ async function speakText(text) {
     hideSpeakingIndicator();
     currentUtterance = null;
   };
+}
 
-  // Speak
-  speechSynthesis.speak(currentUtterance);
+// Enhance text to sound natural using Ollama model via Node server
+async function enhanceText(text) {
+  try {
+    const res = await fetch("http://localhost:3000/enhance", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({ text })
+    });
+
+    if (!res.ok) {
+      throw new Error(`Server responded with status: ${res.status}`);
+    }
+
+    const data = await res.json();
+    return data.result;
+  } catch (error) {
+    console.error('Error enhancing text:', error);
+    throw error;
+  }
+}
+
+// Summarize text using local Ollama model via Node server
+async function summarizeText(text) {
+  try {
+    const res = await fetch("http://localhost:3000/summarize", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({ text })
+    });
+
+    if (!res.ok) {
+      throw new Error(`Server responded with status: ${res.status}`);
+    }
+
+    const data = await res.json();
+    return data.result;
+  } catch (error) {
+    console.error('Error summarizing text:', error);
+    throw error;
+  }
+}
+
+// Handle the complete workflow: select text -> enhance to natural speech -> speak
+async function handleEnhanceAndSpeak(selectedText) {
+  try {
+    // Show loading indicator
+    showSpeakingIndicator('Making text sound natural...');
+
+    // Get enhanced, natural-sounding text from Ollama via Node server
+    const enhancedText = await enhanceText(selectedText);
+
+    // Update indicator
+    hideSpeakingIndicator();
+    showSpeakingIndicator('Reading with natural voice...');
+
+    // Speak the enhanced text using chrome.tts API
+    // The text is now more conversational, so TTS will sound less robotic
+    chrome.tts.speak(enhancedText, {
+      onEvent: (event) => {
+        if (event.type === 'end') {
+          hideSpeakingIndicator();
+        } else if (event.type === 'error') {
+          console.error('TTS error:', event);
+          hideSpeakingIndicator();
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Error in enhance and speak workflow:', error);
+    hideSpeakingIndicator();
+    alert('Error: Could not connect to local server. Make sure the Node server is running on localhost:3000');
+  }
+}
+
+// Handle the complete workflow: select text -> summarize -> speak
+async function handleSummarizeAndSpeak(selectedText) {
+  try {
+    // Show loading indicator
+    showSpeakingIndicator('Summarizing text...');
+
+    // Get summary from Ollama via Node server
+    const summary = await summarizeText(selectedText);
+
+    // Update indicator
+    hideSpeakingIndicator();
+    showSpeakingIndicator('Reading summary...');
+
+    // Speak the summary using chrome.tts API
+    chrome.tts.speak(summary, {
+      onEvent: (event) => {
+        if (event.type === 'end') {
+          hideSpeakingIndicator();
+        } else if (event.type === 'error') {
+          console.error('TTS error:', event);
+          hideSpeakingIndicator();
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Error in summarize and speak workflow:', error);
+    hideSpeakingIndicator();
+    alert('Error: Could not connect to local server. Make sure the Node server is running on localhost:3000');
+  }
 }
 
 // Stop speaking

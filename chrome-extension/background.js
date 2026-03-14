@@ -13,6 +13,18 @@ chrome.runtime.onInstalled.addListener(() => {
     title: 'Read entire page',
     contexts: ['page']
   });
+
+  chrome.contextMenus.create({
+    id: 'enhanceAndSpeak',
+    title: 'Read with natural AI voice',
+    contexts: ['selection']
+  });
+
+  chrome.contextMenus.create({
+    id: 'summarizeAndSpeak',
+    title: 'Summarize and speak',
+    contexts: ['selection']
+  });
 });
 
 // Handle context menu clicks
@@ -28,6 +40,14 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
   } else if (info.menuItemId === 'readPageText') {
     chrome.tabs.sendMessage(tab.id, {
       action: 'speakPageText'
+    });
+  } else if (info.menuItemId === 'enhanceAndSpeak') {
+    chrome.tabs.sendMessage(tab.id, {
+      action: 'enhanceAndSpeak'
+    });
+  } else if (info.menuItemId === 'summarizeAndSpeak') {
+    chrome.tabs.sendMessage(tab.id, {
+      action: 'summarizeAndSpeak'
     });
   }
 });
