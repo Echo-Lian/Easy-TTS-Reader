@@ -24,15 +24,18 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     sendResponse({ success: true });
   }
 
-  if (request.action === 'speakPageText') {
-    const pageText = extractPageText();
-    speakText(pageText);
+  if (request.action === 'stopPageSpeaking') {
+    stopSpeaking();
     sendResponse({ success: true });
   }
 
-  if (request.action === 'stopSpeaking') {
-    stopSpeaking();
-    sendResponse({ success: true });
+  if (request.action === 'speakPageText') {
+    const pageText = extractPageText();
+    // Option A: Just start speaking immediately (Current behavior)
+    speakText(pageText); 
+    
+    // Option B: Send the text back to the popup so it fills the box
+    sendResponse({ text: pageText, success: true });
   }
 
   if (request.action === 'enhanceAndSpeak') {
@@ -118,6 +121,9 @@ async function speakText(text) {
     hideSpeakingIndicator();
     currentUtterance = null;
   };
+
+  // Actually start speaking
+  speechSynthesis.speak(currentUtterance);
 }
 
 // Enhance text to sound natural using Ollama model via Node server

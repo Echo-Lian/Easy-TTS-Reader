@@ -120,11 +120,17 @@ speakBtn.addEventListener('click', async () => {
   }
 });
 
-stopBtn.addEventListener('click', () => {
+stopBtn.addEventListener('click', async () => {
+  // Stop popup-context speech
   if (speechSynthesis.speaking) {
     speechSynthesis.cancel();
-    showStatus('Stopped', 'info');
   }
+  // Also stop content script speech
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    chrome.tabs.sendMessage(tab.id, { action: 'stopPageSpeaking' });
+  } catch (_) {}
+  showStatus('Stopped', 'info');
 });
 
 clearCacheBtn.addEventListener('click', () => {
@@ -149,6 +155,28 @@ getSelectionBtn.addEventListener('click', async () => {
     showStatus('Failed to get selection', 'error');
   }
 });
+
+// Function to automatically grab page text and start speaking when the popup opens
+async function autoCrawlText() {
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    chrome.tabs.sendMessage(tab.id, { action: 'speakPageText' }, (response) => {
+      if (chrome.runtime.lastError) {
+        showStatus('Could not connect to page', 'error');
+        return;
+      }
+      if (response && response.text) {
+        textInput.value = response.text;
+        showStatus('Reading page aloud...', 'success');
+      }
+    });
+  } catch (error) {
+    showStatus('Failed to read page', 'error');
+  }
+}
+
+// Trigger this when the DOM of the popup is loaded
+document.addEventListener('DOMContentLoaded', autoCrawlText);
 
 // Initialize on load
 init();
