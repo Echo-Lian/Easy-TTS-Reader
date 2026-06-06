@@ -28,6 +28,33 @@
 
   <!-- ═══ Main Content ═══ -->
   <main id="main">
+    <!-- Pipeline Visualization -->
+    <div id="pipeline" class="pipeline hidden">
+      <div class="pipeline-step" data-step="load" id="step-load">
+        <div class="step-icon">📄</div>
+        <div class="step-label">Load</div>
+        <div class="step-detail" id="detail-load"></div>
+      </div>
+      <div class="pipeline-connector" id="conn-load-detect"></div>
+      <div class="pipeline-step" data-step="detect" id="step-detect">
+        <div class="step-icon">🌍</div>
+        <div class="step-label">Language</div>
+        <div class="step-detail" id="detail-detect"></div>
+      </div>
+      <div class="pipeline-connector" id="conn-detect-gen"></div>
+      <div class="pipeline-step" data-step="generate" id="step-generate">
+        <div class="step-icon">🔊</div>
+        <div class="step-label">Generate</div>
+        <div class="step-detail" id="detail-generate"></div>
+      </div>
+      <div class="pipeline-connector" id="conn-gen-play"></div>
+      <div class="pipeline-step" data-step="play" id="step-play">
+        <div class="step-icon">▶️</div>
+        <div class="step-label">Play</div>
+        <div class="step-detail" id="detail-play"></div>
+      </div>
+    </div>
+
     <!-- Drop Zone / File Picker -->
     <section id="drop-zone" class="drop-zone">
       <div class="drop-content">

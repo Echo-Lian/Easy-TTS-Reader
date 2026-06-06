@@ -62,7 +62,21 @@ const els = {
   apiKeyStatus: $('api-key-status'),
   openaiLink: $('openai-link'),
   modelSelect: $('model-select'),
-  modelGroup: $('model-group')
+  modelGroup: $('model-group'),
+
+  // Pipeline
+  pipeline: $('pipeline'),
+  stepLoad: $('step-load'),
+  stepDetect: $('step-detect'),
+  stepGenerate: $('step-generate'),
+  stepPlay: $('step-play'),
+  detailLoad: $('detail-load'),
+  detailDetect: $('detail-detect'),
+  detailGenerate: $('detail-generate'),
+  detailPlay: $('detail-play'),
+  connLoadDetect: $('conn-load-detect'),
+  connDetectGen: $('conn-detect-gen'),
+  connGenPlay: $('conn-gen-play')
 };
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -77,6 +91,77 @@ async function init() {
   setupEvents();
   setupModal();
   checkApiKey();
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// PIPELINE VISUALIZATION
+// ═════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Set the state of a pipeline step and its preceding connector.
+ * States: 'pending', 'active', 'done', 'error'
+ */
+function setPipeline(activeStep, details = {}) {
+  const steps = ['load', 'detect', 'generate', 'play'];
+  const stepEls = {
+    load:    { step: els.stepLoad,    detail: els.detailLoad,    conn: null },
+    detect:  { step: els.stepDetect,  detail: els.detailDetect,  conn: els.connLoadDetect },
+    generate:{ step: els.stepGenerate,detail: els.detailGenerate, conn: els.connDetectGen },
+    play:    { step: els.stepPlay,    detail: els.detailPlay,    conn: els.connGenPlay }
+  };
+
+  // Show pipeline if hidden
+  els.pipeline.classList.remove('hidden');
+
+  const activeIdx = steps.indexOf(activeStep);
+
+  for (let i = 0; i < steps.length; i++) {
+    const s = steps[i];
+    const el = stepEls[s];
+    let status;
+
+    if (i < activeIdx) {
+      status = 'done';
+    } else if (i === activeIdx) {
+      status = 'active';
+    } else {
+      status = 'pending';
+    }
+
+    el.step.dataset.status = status;
+
+    // Set connector status (connector after this step)
+    if (el.conn) {
+      if (i < activeIdx) {
+        el.conn.dataset.status = 'done';
+      } else if (i === activeIdx) {
+        el.conn.dataset.status = 'active';
+      } else {
+        el.conn.dataset.status = 'pending';
+      }
+    }
+
+    // Update detail text
+    if (details[s]) {
+      el.detail.textContent = details[s];
+    }
+  }
+}
+
+/** Reset pipeline to default state */
+function resetPipeline() {
+  els.pipeline.classList.add('hidden');
+  ['load', 'detect', 'generate', 'play'].forEach(s => {
+    const step = document.querySelector(`[data-step="${s}"]`);
+    if (step) step.dataset.status = 'pending';
+  });
+  [els.connLoadDetect, els.connDetectGen, els.connGenPlay].forEach(c => {
+    if (c) c.dataset.status = 'pending';
+  });
+  els.detailLoad.textContent = '';
+  els.detailDetect.textContent = '';
+  els.detailGenerate.textContent = '';
+  els.detailPlay.textContent = '';
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -234,18 +319,28 @@ function setupEvents() {
     els.loadingBar.classList.add('hidden');
     els.controls.classList.remove('hidden');
 
+    // Pipeline: load done → detecting
+    const charCount = data.text.length.toLocaleString();
+    const pageInfo = data.pages ? `${data.pages}p` : '';
+    setPipeline('detect', {
+      load: pageInfo ? `${pageInfo} · ${charCount}c` : `${charCount} chars`,
+      detect: 'Detecting…'
+    });
+
     // Reset playback
     resetPlayback();
-    showStatus(`Loaded: ${data.fileName} (${data.text.length.toLocaleString()} chars)`);
+    showStatus(`Loaded: ${data.fileName} (${charCount} chars)`);
   });
 
   window.easyTTS.onLoadingStart((fileName) => {
     els.loadingBar.classList.remove('hidden');
     els.loadingText.textContent = `Loading ${fileName}…`;
+    setPipeline('load', { load: `Reading ${fileName}…` });
   });
 
   window.easyTTS.onLoadingError((msg) => {
     els.loadingBar.classList.add('hidden');
+    els.pipeline.classList.add('hidden');
     showStatus(`⚠️ ${msg}`);
   });
 
@@ -306,11 +401,20 @@ async function handlePlay() {
     els.progress.classList.remove('hidden');
     showStatus('🔊 Speaking…');
 
+    // Pipeline: skip to play for system TTS
+    setPipeline('play', {
+      detect: 'System (macOS)',
+      generate: 'Direct',
+      play: 'Speaking…'
+    });
+
     try {
       const result = await window.easyTTS.speakText({ text, voice: state.voice, speed: state.speed });
       if (!result.success) throw new Error(result.error);
       updateProgressSystem(1, result.totalChunks);
     } catch (error) {
+      const activeStep = document.querySelector('[data-step][data-status="active"]');
+      if (activeStep) activeStep.dataset.status = 'error';
       showStatus(`⚠️ ${error.message}`);
       finishPlayback();
     }
@@ -325,6 +429,20 @@ async function handlePlay() {
       showStatus('🔑 Set your OpenAI API key in Settings');
       return;
     }
+  }
+
+  // Pipeline: detect → generating
+  const langInfo = await window.easyTTS.getSetting('tts-provider');
+  if (provider === 'kokoro') {
+    setPipeline('generate', {
+      detect: 'Kokoro-82M',
+      generate: 'Generating…'
+    });
+  } else {
+    setPipeline('generate', {
+      detect: provider === 'openai' ? 'OpenAI TTS' : 'System',
+      generate: 'Generating…'
+    });
   }
 
   setPlaying(true);
@@ -346,13 +464,22 @@ async function handlePlay() {
 
     if (state.audioChunks.length === 0) throw new Error('No audio was generated');
 
-    const detectedInfo = result.detectedLanguage
-      ? ` [${result.detectedLanguage}]`
-      : '';
+    // Pipeline: generate done → now playing
+    const detectedLang = result.detectedLanguage || '';
+    setPipeline('play', {
+      detect: detectedLang || 'English',
+      generate: `${state.audioChunks.length} chunk${state.audioChunks.length > 1 ? 's' : ''}`,
+      play: 'Playing…'
+    });
+
+    const detectedInfo = detectedLang ? ` [${detectedLang}]` : '';
     showStatus(`🔊 Speaking${detectedInfo} (${state.audioChunks.length} part${state.audioChunks.length > 1 ? 's' : ''})…`);
     await playChunks();
 
   } catch (error) {
+    // Pipeline: mark current step as error
+    const activeStep = document.querySelector('[data-step][data-status="active"]');
+    if (activeStep) activeStep.dataset.status = 'error';
     showStatus(`⚠️ ${error.message}`);
     finishPlayback();
   }
@@ -431,10 +558,10 @@ async function handleStop() {
   // Signal main process to stop (kills say process or aborts OpenAI request)
   await window.easyTTS.stopSpeaking();
 
-  finishPlayback();
+  finishPlayback('Stopped');
 }
 
-function finishPlayback() {
+function finishPlayback(playDetail) {
   setPlaying(false);
   state.isPaused = false;
   state.currentChunk = 0;
@@ -443,6 +570,14 @@ function finishPlayback() {
   els.btnStop.disabled = true;
   els.btnExport.disabled = false;
   els.progress.classList.add('hidden');
+
+  // Pipeline: mark play as done
+  setPipeline('done', {});
+  const playStep = els.stepPlay;
+  if (playStep) playStep.dataset.status = 'done';
+  if (els.connGenPlay) els.connGenPlay.dataset.status = 'done';
+  if (els.detailPlay) els.detailPlay.textContent = playDetail || 'Complete';
+
   // Don't overwrite status if there's already an error/status message
   if (els.statusText.textContent.includes('⚠️') || els.statusText.textContent.includes('✅ Done')) {
     // keep it

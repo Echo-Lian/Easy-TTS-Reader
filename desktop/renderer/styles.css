@@ -105,6 +105,159 @@ body {
   gap: 16px;
 }
 
+/* ═══ Pipeline Visualization ═══ */
+.pipeline {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 0;
+  padding: 16px 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.pipeline.hidden { display: none; }
+
+.pipeline-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 72px;
+  position: relative;
+  transition: opacity 0.3s;
+}
+
+.step-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  background: var(--bg);
+  border: 2px solid var(--border);
+  transition: all 0.4s ease;
+  position: relative;
+}
+
+.step-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-dim);
+  transition: color 0.3s;
+}
+
+.step-detail {
+  font-size: 10px;
+  color: var(--text-dim);
+  min-height: 14px;
+  text-align: center;
+  max-width: 90px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: color 0.3s;
+}
+
+/* Connector line between steps */
+.pipeline-connector {
+  flex: 1;
+  min-width: 24px;
+  max-width: 60px;
+  height: 2px;
+  background: var(--border);
+  align-self: center;
+  margin-bottom: 26px;
+  transition: background 0.4s ease;
+}
+
+/* ── Step states ── */
+
+/* Pending (default) — dimmed */
+.pipeline-step[data-status="pending"] .step-icon {
+  border-color: var(--border);
+  background: var(--bg);
+  opacity: 0.5;
+}
+.pipeline-step[data-status="pending"] .step-label {
+  color: var(--text-dim);
+  opacity: 0.5;
+}
+.pipeline-step[data-status="pending"] .step-detail {
+  opacity: 0.3;
+}
+
+/* Active — pulsing glow */
+.pipeline-step[data-status="active"] .step-icon {
+  border-color: var(--accent);
+  background: var(--surface2);
+  box-shadow: 0 0 12px rgba(233, 69, 96, 0.4);
+  animation: pulse-step 1.5s ease-in-out infinite;
+}
+.pipeline-step[data-status="active"] .step-label {
+  color: var(--accent);
+}
+.pipeline-step[data-status="active"] .step-detail {
+  color: var(--accent);
+  opacity: 0.8;
+}
+
+@keyframes pulse-step {
+  0%, 100% { box-shadow: 0 0 8px rgba(233, 69, 96, 0.3); }
+  50% { box-shadow: 0 0 18px rgba(233, 69, 96, 0.6); }
+}
+
+/* Done — green checkmark overlay */
+.pipeline-step[data-status="done"] .step-icon {
+  border-color: #4ade80;
+  background: rgba(74, 222, 128, 0.1);
+}
+.pipeline-step[data-status="done"] .step-icon::after {
+  content: '✓';
+  position: absolute;
+  bottom: -2px;
+  right: -4px;
+  font-size: 10px;
+  color: #4ade80;
+  font-weight: bold;
+}
+.pipeline-step[data-status="done"] .step-label,
+.pipeline-step[data-status="done"] .step-detail {
+  color: #4ade80;
+}
+
+/* Error */
+.pipeline-step[data-status="error"] .step-icon {
+  border-color: var(--accent);
+  background: rgba(233, 69, 96, 0.15);
+}
+.pipeline-step[data-status="error"] .step-icon::after {
+  content: '✗';
+  position: absolute;
+  bottom: -2px;
+  right: -4px;
+  font-size: 10px;
+  color: var(--accent);
+  font-weight: bold;
+}
+.pipeline-step[data-status="error"] .step-label,
+.pipeline-step[data-status="error"] .step-detail {
+  color: var(--accent);
+}
+
+/* Connector state: done = green */
+.pipeline-connector[data-status="done"] {
+  background: #4ade80;
+}
+.pipeline-connector[data-status="active"] {
+  background: linear-gradient(90deg, #4ade80, var(--border));
+}
+
 /* ═══ Drop Zone ═══ */
 .drop-zone {
   position: relative;
