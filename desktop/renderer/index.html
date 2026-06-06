@@ -3,129 +3,138 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' http://localhost:11434">
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self';
+               script-src 'self';
+               style-src 'self' 'unsafe-inline';
+               media-src 'self' data: blob:;
+               connect-src 'self';">
   <title>Easy TTS Reader</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <div class="app-container">
-    <!-- Header -->
-    <header class="header">
-      <div class="header-content">
-        <h1>Easy TTS Reader</h1>
-        <p class="subtitle">AI-Powered Text-to-Speech Desktop Application</p>
-      </div>
-      <div class="header-actions">
-        <button id="open-text-btn" class="icon-btn" title="Open Text File (Ctrl+O)">
-          📄 Open Text
-        </button>
-        <button id="open-image-btn" class="icon-btn" title="Open Image with OCR (Ctrl+Shift+O)">
-          🖼️ Open Image
-        </button>
-      </div>
-    </header>
 
-    <!-- Main Content -->
-    <main class="main-content">
-      <!-- Text Editor Section -->
-      <section class="editor-section">
-        <div class="section-header">
-          <h2>Text Content</h2>
-          <div class="editor-actions">
-            <button id="clear-text-btn" class="small-btn">Clear</button>
-            <button id="paste-btn" class="small-btn">Paste</button>
+<div id="app">
+  <!-- ═══ Header ═══ -->
+  <header id="header">
+    <div class="header-left">
+      <h1>🐚 Easy TTS Reader</h1>
+      <span id="file-label" class="file-label"></span>
+    </div>
+    <div class="header-right">
+      <button id="btn-settings" class="icon-btn" title="API Settings">⚙️</button>
+    </div>
+  </header>
+
+  <!-- ═══ Main Content ═══ -->
+  <main id="main">
+    <!-- Drop Zone / File Picker -->
+    <section id="drop-zone" class="drop-zone">
+      <div class="drop-content">
+        <div class="drop-icon">📄</div>
+        <p class="drop-title">Drop a PDF here</p>
+        <p class="drop-sub">or <a href="#" id="browse-link">browse files</a></p>
+        <p class="drop-hint">Supports PDF, TXT, MD</p>
+      </div>
+      <div class="drop-overlay" id="drop-overlay">
+        <span class="drop-overlay-text">Drop to open</span>
+      </div>
+    </section>
+
+    <!-- Progress bar during loading -->
+    <div id="loading-bar" class="loading-bar hidden">
+      <div class="loading-bar-fill"></div>
+      <span id="loading-text">Loading…</span>
+    </div>
+
+    <!-- Text Display -->
+    <section id="text-section" class="text-section hidden">
+      <div class="section-header">
+        <h2 id="doc-title">Document</h2>
+        <span id="doc-meta" class="doc-meta"></span>
+      </div>
+      <div id="text-display" class="text-display" contenteditable="true"></div>
+    </section>
+
+    <!-- Controls -->
+    <section id="controls" class="controls hidden">
+      <div class="controls-row">
+        <button id="btn-play" class="btn btn-primary">▶ Play</button>
+        <button id="btn-stop" class="btn btn-secondary" disabled>⏹ Stop</button>
+        <button id="btn-export" class="btn btn-outline" disabled>💾 Export</button>
+      </div>
+
+      <div class="controls-row">
+        <label class="control-group">
+          <span class="control-label">Speed</span>
+          <input type="range" id="speed-slider" min="0.5" max="2.0" step="0.1" value="1.0">
+          <span id="speed-value" class="control-value">1.0×</span>
+        </label>
+
+        <label class="control-group">
+          <span class="control-label">Voice</span>
+          <select id="voice-select"></select>
+        </label>
+      </div>
+
+      <!-- Progress -->
+      <div id="progress" class="progress hidden">
+        <div id="progress-bar" class="progress-bar">
+          <div id="progress-fill" class="progress-fill"></div>
+        </div>
+        <span id="progress-text" class="progress-text">0 / 0</span>
+      </div>
+    </section>
+
+    <!-- Status bar -->
+    <div id="status" class="status hidden">
+      <span id="status-text"></span>
+    </div>
+  </main>
+
+  <!-- ═══ Settings Modal ═══ -->
+  <div id="settings-modal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Settings</h2>
+        <button id="modal-close" class="icon-btn">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="provider-select">TTS Provider</label>
+          <select id="provider-select"></select>
+          <p class="form-hint" id="provider-pricing"></p>
+        </div>
+
+        <div id="api-key-group" class="form-group hidden">
+          <label for="api-key-input">OpenAI API Key</label>
+          <div class="input-row">
+            <input type="password" id="api-key-input" placeholder="sk-...">
+            <button id="btn-validate-key" class="btn btn-small">Validate</button>
           </div>
-        </div>
-        <textarea id="text-input" placeholder="Enter or paste text here, or open a file..."></textarea>
-        <div class="text-stats">
-          <span id="char-count">0 characters</span>
-          <span id="word-count">0 words</span>
-        </div>
-      </section>
-
-      <!-- Controls Section -->
-      <section class="controls-section">
-        <h2>Voice Settings</h2>
-
-        <div class="control-group">
-          <label for="speed">
-            Speed: <span id="speed-value">1.0</span>x
-          </label>
-          <input type="range" id="speed" min="0.5" max="2.0" step="0.1" value="1.0">
+          <p id="api-key-status" class="form-hint"></p>
+          <p class="form-hint">
+            Get your key at
+            <a href="#" id="openai-link">platform.openai.com/api-keys</a>
+          </p>
         </div>
 
-        <div class="control-group">
-          <label for="pitch">
-            Pitch: <span id="pitch-value">1.0</span>
-          </label>
-          <input type="range" id="pitch" min="0.5" max="2.0" step="0.1" value="1.0">
-        </div>
-
-        <div class="control-group">
-          <label for="volume">
-            Volume: <span id="volume-value">1.0</span>
-          </label>
-          <input type="range" id="volume" min="0" max="1.0" step="0.1" value="1.0">
-        </div>
-
-        <div class="control-group">
-          <label for="language">Language:</label>
-          <select id="language">
-            <option value="en-US" selected>English (US)</option>
-            <option value="en-GB">English (UK)</option>
-            <option value="es-ES">Spanish</option>
-            <option value="fr-FR">French</option>
-            <option value="de-DE">German</option>
-            <option value="it-IT">Italian</option>
-            <option value="ja-JP">Japanese</option>
-            <option value="zh-CN">Chinese</option>
-            <option value="ko-KR">Korean</option>
-            <option value="ru-RU">Russian</option>
+        <div id="model-group" class="form-group hidden">
+          <label for="model-select">TTS Model</label>
+          <select id="model-select">
+            <option value="tts-1">tts-1 (faster)</option>
+            <option value="tts-1-hd">tts-1-hd (higher quality)</option>
           </select>
         </div>
-
-        <div class="checkbox-group">
-          <label>
-            <input type="checkbox" id="ai-enhance">
-            Enhance with AI (Ollama)
-          </label>
-        </div>
-
-        <!-- Batch Processing -->
-        <div class="batch-section">
-          <h3>Batch Processing</h3>
-          <button id="add-batch-btn" class="secondary-btn">Add Multiple Files</button>
-          <div id="batch-list" class="batch-list"></div>
-          <button id="process-batch-btn" class="secondary-btn" disabled>Process Batch</button>
-        </div>
-      </section>
-    </main>
-
-    <!-- Action Bar -->
-    <footer class="action-bar">
-      <div class="status-info">
-        <p id="status-message"></p>
-        <p id="cache-info" class="small-text"></p>
       </div>
-      <div class="action-buttons">
-        <button id="speak-btn" class="primary-btn large-btn">
-          🔊 Speak
-        </button>
-        <button id="stop-btn" class="danger-btn large-btn">
-          ⏹️ Stop
-        </button>
-        <button id="export-btn" class="secondary-btn">
-          💾 Export Audio
-        </button>
-        <button id="clear-cache-btn" class="secondary-btn">
-          🗑️ Clear Cache
-        </button>
+      <div class="modal-footer">
+        <button id="modal-done" class="btn btn-primary">Done</button>
       </div>
-    </footer>
+    </div>
   </div>
+</div>
 
-  <script src="../../shared/tts-service.js"></script>
-  <script src="../../shared/storage-adapter.js"></script>
-  <script src="app.js"></script>
+<script src="app.js"></script>
 </body>
 </html>

@@ -1,37 +1,50 @@
-.github
-.claude
-
-# Dependencies
+# ─── Dependencies (massive, never track) ──────────────────────────────────
 node_modules/
 package-lock.json
 
-# Build outputs
+# ─── Python environment (36K files, 900MB) ──────────────────────────────
+.kokoro-venv/
+__pycache__/
+*.py[cod]
+
+# ─── Build outputs ──────────────────────────────────────────────────────
 dist/
 build/
+out/
 
-# OS files
+# ─── OS trash ───────────────────────────────────────────────────────────
 .DS_Store
 Thumbs.db
+._*
 
-# IDE
+# ─── IDE / editor ───────────────────────────────────────────────────────
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
 
-# Logs
-logs/
+# ─── Logs ───────────────────────────────────────────────────────────────
 *.log
-npm-debug.log*
+logs/
 
-# Environment
+# ─── Environment / secrets ──────────────────────────────────────────────
 .env
 .env.local
+.env.*.local
+openai-api-key
 
-# Electron
-out/
+# ─── Model cache (already in ~/.cache, but don't let it slip locally) ───
+.huggingface/
+models/
 
-# Misc
-*.zip
-*.xpi
+# ─── Temp audio files ──────────────────────────────────────────────────
+*.wav
+*.aiff
+*.caf
+*.mp3
+*.mp4
+outputs/
+
+# ─── Hugging Face / torch cache ────────────────────────────────────────
+.cache/

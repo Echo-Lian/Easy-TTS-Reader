@@ -1,131 +1,128 @@
 /**
- * Easy TTS Reader - Desktop Application
- * Main Process (Electron)
+ * Easy TTS Reader — Electron Main Process
+ *
+ * Phase 1: PDF extraction + TTS playback
  */
 
-const { app, BrowserWindow, ipcMain, dialog, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, Menu, shell } = require('electron');
 const path = require('path');
-const fs = require('fs').promises;
 const Store = require('electron-store');
+const PdfService = require('./services/pdf-service');
+const TtsService = require('./services/tts-service');
 
-const store = new Store();
+// ─── Persistence ──────────────────────────────────────────────────────────────
+const store = new Store({
+  defaults: {
+    'tts-provider': 'kokoro',
+    'tts-voice': 'af_bella',
+    'tts-speed': 1.0,
+    'window-width': 900,
+    'window-height': 700
+  }
+});
 
-let mainWindow;
+// ─── Services ─────────────────────────────────────────────────────────────────
+const pdfService = new PdfService();
+const ttsService = new TtsService(store);
+
+// ─── Window ───────────────────────────────────────────────────────────────────
+let mainWindow = null;
 
 function createWindow() {
+  const [width, height] = [store.get('window-width'), store.get('window-height')];
+
   mainWindow = new BrowserWindow({
-    width: 900,
-    height: 700,
+    width,
+    height,
     minWidth: 700,
     minHeight: 500,
+    title: 'Easy TTS Reader',
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
       preload: path.join(__dirname, 'preload.js')
-    },
-    icon: path.join(__dirname, 'icons/icon.png')
+    }
   });
 
   mainWindow.loadFile(path.join(__dirname, 'renderer/index.html'));
 
-  // Create menu
-  createMenu();
+  // Save window size on resize
+  mainWindow.on('resize', () => {
+    const [w, h] = mainWindow.getSize();
+    store.set('window-width', w);
+    store.set('window-height', h);
+  });
 
-  // Open DevTools in development
+  mainWindow.on('closed', () => { mainWindow = null; });
+
+  buildMenu();
+
+  // Open DevTools in dev mode
   if (process.env.NODE_ENV === 'development') {
     mainWindow.webContents.openDevTools();
   }
-
-  mainWindow.on('closed', () => {
-    mainWindow = null;
-  });
 }
 
-function createMenu() {
+// ─── Menu ─────────────────────────────────────────────────────────────────────
+function buildMenu() {
   const template = [
     {
       label: 'File',
       submenu: [
         {
-          label: 'Open Text File',
+          label: 'Open PDF / Text File...',
           accelerator: 'CmdOrCtrl+O',
-          click: () => {
-            openTextFile();
-          }
-        },
-        {
-          label: 'Open Image (OCR)',
-          accelerator: 'CmdOrCtrl+Shift+O',
-          click: () => {
-            openImageFile();
-          }
+          click: () => openFile()
         },
         { type: 'separator' },
         {
-          label: 'Export Audio',
+          label: 'Export Audio...',
           accelerator: 'CmdOrCtrl+E',
           click: () => {
-            mainWindow.webContents.send('export-audio');
+            mainWindow?.webContents.send('trigger-export');
           }
         },
         { type: 'separator' },
-        {
-          label: 'Exit',
-          accelerator: 'CmdOrCtrl+Q',
-          click: () => {
-            app.quit();
-          }
-        }
+        { role: 'quit' }
       ]
     },
     {
-      label: 'Edit',
-      submenu: [
-        { role: 'undo' },
-        { role: 'redo' },
-        { type: 'separator' },
-        { role: 'cut' },
-        { role: 'copy' },
-        { role: 'paste' },
-        { role: 'selectAll' }
-      ]
-    },
-    {
-      label: 'Speech',
+      label: 'Playback',
       submenu: [
         {
-          label: 'Speak',
-          accelerator: 'CmdOrCtrl+S',
-          click: () => {
-            mainWindow.webContents.send('speak');
-          }
+          label: 'Play / Resume',
+          accelerator: 'Space',
+          click: () => mainWindow?.webContents.send('trigger-play')
+        },
+        {
+          label: 'Pause',
+          accelerator: 'CmdOrCtrl+P',
+          click: () => mainWindow?.webContents.send('trigger-pause')
         },
         {
           label: 'Stop',
-          accelerator: 'CmdOrCtrl+.',
-          click: () => {
-            mainWindow.webContents.send('stop');
-          }
+          accelerator: 'Escape',
+          click: () => mainWindow?.webContents.send('trigger-stop')
         },
         { type: 'separator' },
         {
-          label: 'Clear Cache',
-          click: () => {
-            mainWindow.webContents.send('clear-cache');
-          }
+          label: 'Speed Up',
+          accelerator: 'CmdOrCtrl+=',
+          click: () => mainWindow?.webContents.send('trigger-speed-up')
+        },
+        {
+          label: 'Slow Down',
+          accelerator: 'CmdOrCtrl+-',
+          click: () => mainWindow?.webContents.send('trigger-speed-down')
         }
       ]
     },
     {
       label: 'View',
       submenu: [
-        { role: 'reload' },
         { role: 'toggleDevTools' },
         { type: 'separator' },
-        { role: 'resetZoom' },
-        { role: 'zoomIn' },
-        { role: 'zoomOut' },
-        { type: 'separator' },
+        { role: 'reload' },
         { role: 'togglefullscreen' }
       ]
     },
@@ -133,13 +130,13 @@ function createMenu() {
       label: 'Help',
       submenu: [
         {
-          label: 'About',
+          label: 'About Easy TTS Reader',
           click: () => {
             dialog.showMessageBox(mainWindow, {
               type: 'info',
               title: 'About Easy TTS Reader',
-              message: 'Easy TTS Reader v1.0.0',
-              detail: 'Free AI-powered Text-to-Speech reader with Ollama\n\nBuilt with Electron'
+              message: 'Easy TTS Reader v2.0',
+              detail: 'PDF-to-Audio reader powered by AI TTS\n\nBuilt with Electron ❤️'
             });
           }
         }
@@ -147,122 +144,213 @@ function createMenu() {
     }
   ];
 
-  const menu = Menu.buildFromTemplate(template);
-  Menu.setApplicationMenu(menu);
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
-async function openTextFile() {
-  const result = await dialog.showOpenDialog(mainWindow, {
-    properties: ['openFile'],
-    filters: [
-      { name: 'Text Files', extensions: ['txt', 'md', 'rtf'] },
-      { name: 'All Files', extensions: ['*'] }
-    ]
-  });
+// ─── File Open ────────────────────────────────────────────────────────────────
+async function openFile(targetPath) {
+  if (!mainWindow) return;
 
-  if (!result.canceled && result.filePaths.length > 0) {
-    const filePath = result.filePaths[0];
-    try {
-      const content = await fs.readFile(filePath, 'utf-8');
-      mainWindow.webContents.send('file-loaded', { type: 'text', content });
-    } catch (error) {
-      dialog.showErrorBox('Error', `Failed to load file: ${error.message}`);
+  let filePath = targetPath;
+
+  if (!filePath) {
+    const result = await dialog.showOpenDialog(mainWindow, {
+      properties: ['openFile'],
+      filters: [
+        { name: 'Documents', extensions: ['pdf', 'txt', 'md'] },
+        { name: 'PDF Files', extensions: ['pdf'] },
+        { name: 'Text Files', extensions: ['txt', 'md'] },
+        { name: 'All Files', extensions: ['*'] }
+      ]
+    });
+
+    if (result.canceled || result.filePaths.length === 0) return;
+    filePath = result.filePaths[0];
+  }
+
+  try {
+    mainWindow.webContents.send('loading-start', path.basename(filePath));
+
+    const result = await pdfService.extractAny(filePath);
+
+    mainWindow.webContents.send('file-loaded', {
+      filePath,
+      fileName: path.basename(filePath),
+      text: result.text,
+      pages: result.pages,
+      title: result.title
+    });
+
+    // Remember last opened directory
+    store.set('last-dir', path.dirname(filePath));
+
+  } catch (error) {
+    mainWindow.webContents.send('loading-error', error.message);
+  }
+}
+
+// ─── IPC Handlers ─────────────────────────────────────────────────────────────
+
+// Open a file (called from renderer or menu)
+ipcMain.handle('open-file', async () => {
+  await openFile();
+  return true;
+});
+
+// Handle dropped files
+ipcMain.handle('open-file-path', async (_event, filePath) => {
+  await openFile(filePath);
+  return true;
+});
+
+// API key validation
+ipcMain.handle('validate-api-key', async (_event, apiKey) => {
+  try {
+    const valid = await ttsService.validateApiKey(apiKey);
+    if (valid) store.set('openai-api-key', apiKey);
+    return { valid };
+  } catch (error) {
+    return { valid: false, error: error.message };
+  }
+});
+
+// ── Synthesize speech (generic, provider-aware) ────────────────────────
+ipcMain.handle('speak-text', async (_event, options) => {
+  try {
+    const { text, voice, speed } = options;
+    if (!text || !text.trim()) throw new Error('No text to speak');
+
+    const provider = store.get('tts-provider') || 'kokoro';
+
+    // Kokoro: generate WAV chunks via Python (auto-detects language)
+    if (provider === 'kokoro') {
+      const results = await ttsService.generateKokoroAudio(text, {
+        voice: voice || store.get('tts-voice'),
+        speed: speed || store.get('tts-speed')
+      });
+      const detectedLang = results[0]?.detectedLanguage || null;
+      const detectedIso = results[0]?.detectedIso || null;
+      return { success: true, chunks: results, detectedLanguage: detectedLang, detectedIso: detectedIso };
     }
+
+    // OpenAI: generate MP3 chunks
+    if (provider === 'openai') {
+      const results = await ttsService.generateOpenAIAudio(text, {
+        apiKey: store.get('openai-api-key'),
+        voice: voice || store.get('tts-voice'),
+        model: 'tts-1',
+        speed: speed || store.get('tts-speed')
+      });
+      return { success: true, chunks: results };
+    }
+
+    // System TTS: play directly through speakers
+    if (provider === 'system') {
+      const PdfService = require('./services/pdf-service');
+      const pdfService = new PdfService();
+      const chunks = text.length > 5000 ? pdfService.chunkText(text, 4000) : [text];
+
+      // Fire chunks in background, send events
+      playSystemChunks(chunks, { voice, speed });
+      return { success: true, mode: 'direct', totalChunks: chunks.length };
+    }
+
+    throw new Error(`Unknown provider: ${provider}`);
+  } catch (error) {
+    return { success: false, error: error.message };
   }
+});
+
+async function playSystemChunks(chunks, opts) {
+  for (let i = 0; i < chunks.length; i++) {
+    if (mainWindow) {
+      mainWindow.webContents.send('system-playing', { current: i + 1, total: chunks.length });
+    }
+    try {
+      await ttsService.playDirectSystem(chunks[i], { voice: opts.voice, speed: opts.speed });
+    } catch { break; }
+  }
+  if (mainWindow) mainWindow.webContents.send('system-done');
 }
 
-async function openImageFile() {
-  const result = await dialog.showOpenDialog(mainWindow, {
-    properties: ['openFile'],
-    filters: [
-      { name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'bmp', 'tiff'] },
-      { name: 'All Files', extensions: ['*'] }
-    ]
-  });
+// Stop speech (both OpenAI generation and system TTS)
+ipcMain.handle('stop-speaking', () => {
+  ttsService.stop();
+  return true;
+});
 
-  if (!result.canceled && result.filePaths.length > 0) {
-    const filePath = result.filePaths[0];
-    mainWindow.webContents.send('image-selected', { filePath });
-  }
-}
+function getTtsService() { return ttsService; }
 
-// IPC Handlers
-ipcMain.handle('get-store-value', (event, key) => {
+// Settings
+ipcMain.handle('get-setting', (_event, key) => {
   return store.get(key);
 });
 
-ipcMain.handle('set-store-value', (event, key, value) => {
+ipcMain.handle('set-setting', (_event, key, value) => {
   store.set(key, value);
   return true;
 });
 
-ipcMain.handle('delete-store-value', (event, key) => {
-  store.delete(key);
-  return true;
+ipcMain.handle('get-all-settings', () => {
+  return store.store;
 });
 
-ipcMain.handle('clear-store', () => {
-  store.clear();
-  return true;
+// Provider info
+ipcMain.handle('get-providers', () => {
+  return ttsService.getProviders();
 });
 
-ipcMain.handle('select-file', async (event, options) => {
-  const result = await dialog.showOpenDialog(mainWindow, options);
-  return result;
-});
-
-ipcMain.handle('save-file', async (event, options) => {
-  const result = await dialog.showSaveDialog(mainWindow, options);
-  return result;
-});
-
-ipcMain.handle('read-file', async (event, filePath) => {
+// System voices
+ipcMain.handle('list-system-voices', async () => {
   try {
-    const content = await fs.readFile(filePath, 'utf-8');
-    return { success: true, content };
+    return await ttsService.listSystemVoices();
+  } catch {
+    return [];
+  }
+});
+
+// Export audio to file
+ipcMain.handle('export-audio', async (_event, audioDataUrl) => {
+  // Remove data URL prefix
+  const base64Data = audioDataUrl.replace(/^data:audio\/\w+;base64,/, '');
+  const buffer = Buffer.from(base64Data, 'base64');
+
+  const result = await dialog.showSaveDialog(mainWindow, {
+    title: 'Export Audio',
+    defaultPath: 'speech.mp3',
+    filters: [
+      { name: 'MP3 Audio', extensions: ['mp3'] }
+    ]
+  });
+
+  if (result.canceled) return { success: false };
+
+  try {
+    const fs = require('fs').promises;
+    await fs.writeFile(result.filePath, buffer);
+    return { success: true, filePath: result.filePath };
   } catch (error) {
     return { success: false, error: error.message };
   }
 });
 
-ipcMain.handle('write-file', async (event, filePath, content) => {
-  try {
-    await fs.writeFile(filePath, content, 'utf-8');
-    return { success: true };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-});
-
-ipcMain.handle('perform-ocr', async (event, imagePath) => {
-  try {
-    // Note: This requires tesseract.js or similar OCR library
-    // For now, return a placeholder
-    // In production, you would use:
-    // const Tesseract = require('tesseract.js');
-    // const { data: { text } } = await Tesseract.recognize(imagePath, 'eng');
-    // return { success: true, text };
-
-    return {
-      success: false,
-      error: 'OCR functionality requires tesseract.js to be installed. Run: npm install tesseract.js'
-    };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-});
-
-// App lifecycle
+// ─── App Lifecycle ────────────────────────────────────────────────────────────
 app.whenReady().then(createWindow);
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
+  if (process.platform !== 'darwin') app.quit();
 });
 
 app.on('activate', () => {
-  if (BrowserWindow.getAllWindows().length === 0) {
-    createWindow();
+  if (BrowserWindow.getAllWindows().length === 0) createWindow();
+});
+
+// Handle file open from OS (macOS: open file with app)
+app.on('open-file', (_event, filePath) => {
+  _event.preventDefault();
+  if (mainWindow) {
+    openFile(filePath);
+  } else {
+    app.whenReady().then(() => openFile(filePath));
   }
 });

@@ -1,354 +1,664 @@
 /**
- * Easy TTS Reader - Desktop Application
- * Renderer Process
+ * Easy TTS Reader — Renderer Process (Phase 1)
+ *
+ * UI logic: file loading, text display, TTS playback, settings
  */
 
-// Initialize services
-const ttsService = new TTSService();
-const storage = new StorageAdapter();
+// ─── State ───────────────────────────────────────────────────────────────────
+const state = {
+  currentText: '',
+  currentFile: null,
+  audioChunks: [],
+  currentChunk: 0,
+  isPlaying: false,
+  isPaused: false,
+  audioContext: null,
+  audioSource: null,
+  gainNode: null,
+  speed: 1.0,
+  voice: 'alloy',
+  provider: 'openai',
+  systemVoices: []
+};
 
-// Batch processing state
-let batchFiles = [];
+// ─── DOM References ──────────────────────────────────────────────────────────
+const $ = (id) => document.getElementById(id);
 
-// DOM Elements
-const textInput = document.getElementById('text-input');
-const speedSlider = document.getElementById('speed');
-const pitchSlider = document.getElementById('pitch');
-const volumeSlider = document.getElementById('volume');
-const languageSelect = document.getElementById('language');
-const aiEnhanceCheckbox = document.getElementById('ai-enhance');
-const speakBtn = document.getElementById('speak-btn');
-const stopBtn = document.getElementById('stop-btn');
-const exportBtn = document.getElementById('export-btn');
-const clearCacheBtn = document.getElementById('clear-cache-btn');
-const openTextBtn = document.getElementById('open-text-btn');
-const openImageBtn = document.getElementById('open-image-btn');
-const clearTextBtn = document.getElementById('clear-text-btn');
-const pasteBtn = document.getElementById('paste-btn');
-const statusMessage = document.getElementById('status-message');
-const cacheInfo = document.getElementById('cache-info');
-const charCount = document.getElementById('char-count');
-const wordCount = document.getElementById('word-count');
-const speedValue = document.getElementById('speed-value');
-const pitchValue = document.getElementById('pitch-value');
-const volumeValue = document.getElementById('volume-value');
-const addBatchBtn = document.getElementById('add-batch-btn');
-const processBatchBtn = document.getElementById('process-batch-btn');
-const batchList = document.getElementById('batch-list');
+const els = {
+  dropZone: $('drop-zone'),
+  dropOverlay: $('drop-overlay'),
+  browseLink: $('browse-link'),
+  loadingBar: $('loading-bar'),
+  loadingText: $('loading-text'),
+  textSection: $('text-section'),
+  textDisplay: $('text-display'),
+  docTitle: $('doc-title'),
+  docMeta: $('doc-meta'),
+  fileLabel: $('file-label'),
+  controls: $('controls'),
+  btnPlay: $('btn-play'),
+  btnStop: $('btn-stop'),
+  btnExport: $('btn-export'),
+  btnSettings: $('btn-settings'),
+  speedSlider: $('speed-slider'),
+  speedValue: $('speed-value'),
+  voiceSelect: $('voice-select'),
+  progress: $('progress'),
+  progressFill: $('progress-fill'),
+  progressText: $('progress-text'),
+  status: $('status'),
+  statusText: $('status-text'),
 
-// Initialize
+  // Modal
+  settingsModal: $('settings-modal'),
+  modalClose: $('modal-close'),
+  modalDone: $('modal-done'),
+  modalBackdrop: document.querySelector('.modal-backdrop'),
+  providerSelect: $('provider-select'),
+  providerPricing: $('provider-pricing'),
+  apiKeyGroup: $('api-key-group'),
+  apiKeyInput: $('api-key-input'),
+  btnValidateKey: $('btn-validate-key'),
+  apiKeyStatus: $('api-key-status'),
+  openaiLink: $('openai-link'),
+  modelSelect: $('model-select'),
+  modelGroup: $('model-group')
+};
+
+// ═════════════════════════════════════════════════════════════════════════════
+// INIT
+// ═════════════════════════════════════════════════════════════════════════════
+
 async function init() {
-  await ttsService.loadPreferences(storage);
-  loadPreferencesUI();
-  updateCacheInfo();
-  setupEventListeners();
-  setupIPCListeners();
-  updateTextStats();
+  await loadSettings();
+  setupDragDrop();
+  setupButtons();
+  setupKeyboardShortcuts();
+  setupEvents();
+  setupModal();
+  checkApiKey();
 }
 
-// Load preferences into UI
-function loadPreferencesUI() {
-  const prefs = ttsService.preferences;
-  speedSlider.value = prefs.speed;
-  pitchSlider.value = prefs.pitch;
-  volumeSlider.value = prefs.volume;
-  languageSelect.value = prefs.language;
-  updateSliderValues();
+// ═════════════════════════════════════════════════════════════════════════════
+// SETTINGS
+// ═════════════════════════════════════════════════════════════════════════════
+
+async function loadSettings() {
+  state.speed = parseFloat(await window.easyTTS.getSetting('tts-speed')) || 1.0;
+  state.provider = await window.easyTTS.getSetting('tts-provider') || 'openai';
+  state.voice = await window.easyTTS.getSetting('tts-voice') || 'alloy';
+
+  // Preload macOS voices for system provider
+  state.systemVoices = await window.easyTTS.listSystemVoices();
+
+  els.speedSlider.value = state.speed;
+  els.speedValue.textContent = state.speed.toFixed(1) + '×';
+
+  // Populate voice dropdown based on provider
+  await populateVoices(state.provider);
 }
 
-// Update slider value displays
-function updateSliderValues() {
-  speedValue.textContent = speedSlider.value;
-  pitchValue.textContent = pitchSlider.value;
-  volumeValue.textContent = volumeSlider.value;
+async function saveSetting(key, value) {
+  await window.easyTTS.setSetting(key, value);
 }
 
-// Update text statistics
-function updateTextStats() {
-  const text = textInput.value;
-  const chars = text.length;
-  const words = text.trim() ? text.trim().split(/\s+/).length : 0;
+// Check if API key is set
+async function checkApiKey() {
+  const key = await window.easyTTS.getSetting('openai-api-key');
+  const provider = await window.easyTTS.getSetting('tts-provider') || 'kokoro';
 
-  charCount.textContent = `${chars} character${chars !== 1 ? 's' : ''}`;
-  wordCount.textContent = `${words} word${words !== 1 ? 's' : ''}`;
-}
-
-// Update cache info
-function updateCacheInfo() {
-  const size = ttsService.getCacheSize();
-  cacheInfo.textContent = `Cache: ${size} item${size !== 1 ? 's' : ''}`;
-}
-
-// Show status message
-function showStatus(message, type = 'info') {
-  statusMessage.textContent = message;
-  statusMessage.className = `status-${type}`;
-  setTimeout(() => {
-    statusMessage.textContent = '';
-    statusMessage.className = '';
-  }, 3000);
-}
-
-// Setup event listeners
-function setupEventListeners() {
-  // Text input
-  textInput.addEventListener('input', updateTextStats);
-
-  // Sliders
-  speedSlider.addEventListener('input', () => {
-    updateSliderValues();
-    ttsService.updatePreferences({ speed: parseFloat(speedSlider.value) });
-    ttsService.savePreferences(storage);
-  });
-
-  pitchSlider.addEventListener('input', () => {
-    updateSliderValues();
-    ttsService.updatePreferences({ pitch: parseFloat(pitchSlider.value) });
-    ttsService.savePreferences(storage);
-  });
-
-  volumeSlider.addEventListener('input', () => {
-    updateSliderValues();
-    ttsService.updatePreferences({ volume: parseFloat(volumeSlider.value) });
-    ttsService.savePreferences(storage);
-  });
-
-  languageSelect.addEventListener('change', () => {
-    ttsService.updatePreferences({ language: languageSelect.value });
-    ttsService.savePreferences(storage);
-  });
-
-  // Buttons
-  speakBtn.addEventListener('click', handleSpeak);
-  stopBtn.addEventListener('click', handleStop);
-  exportBtn.addEventListener('click', handleExport);
-  clearCacheBtn.addEventListener('click', handleClearCache);
-  openTextBtn.addEventListener('click', handleOpenText);
-  openImageBtn.addEventListener('click', handleOpenImage);
-  clearTextBtn.addEventListener('click', () => {
-    textInput.value = '';
-    updateTextStats();
-  });
-  pasteBtn.addEventListener('click', async () => {
-    const text = await navigator.clipboard.readText();
-    textInput.value = text;
-    updateTextStats();
-  });
-
-  // Batch processing
-  addBatchBtn.addEventListener('click', handleAddBatch);
-  processBatchBtn.addEventListener('click', handleProcessBatch);
-}
-
-// Setup IPC listeners from main process
-function setupIPCListeners() {
-  if (window.electronIPC) {
-    window.electronIPC.onFileLoaded((data) => {
-      if (data.type === 'text') {
-        textInput.value = data.content;
-        updateTextStats();
-        showStatus('File loaded successfully', 'success');
-      }
-    });
-
-    window.electronIPC.onImageSelected(async (data) => {
-      await handleOCR(data.filePath);
-    });
-
-    window.electronIPC.onSpeak(() => handleSpeak());
-    window.electronIPC.onStop(() => handleStop());
-    window.electronIPC.onClearCache(() => handleClearCache());
-    window.electronIPC.onExportAudio(() => handleExport());
+  if (provider === 'openai' && !key) {
+    showStatus('🔑 Set your OpenAI API key in Settings to enable speech');
+  } else if (provider === 'kokoro') {
+    // Kokoro is ready to go — no key needed
   }
 }
 
-// Handle speak
-async function handleSpeak() {
-  const text = textInput.value.trim();
-  if (!text) {
-    showStatus('Please enter some text', 'error');
+// ═════════════════════════════════════════════════════════════════════════════
+// DRAG & DROP
+// ═════════════════════════════════════════════════════════════════════════════
+
+function setupDragDrop() {
+  // Click to browse
+  els.dropZone.addEventListener('click', (e) => {
+    if (e.target.tagName !== 'A') handleBrowse();
+  });
+  els.browseLink.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    handleBrowse();
+  });
+
+  // Drag events
+  let dragCounter = 0;
+
+  els.dropZone.addEventListener('dragenter', (e) => {
+    e.preventDefault();
+    dragCounter++;
+    els.dropZone.classList.add('drag-over');
+  });
+
+  els.dropZone.addEventListener('dragleave', (e) => {
+    e.preventDefault();
+    dragCounter--;
+    if (dragCounter === 0) els.dropZone.classList.remove('drag-over');
+  });
+
+  els.dropZone.addEventListener('dragover', (e) => e.preventDefault());
+
+  els.dropZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dragCounter = 0;
+    els.dropZone.classList.remove('drag-over');
+
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+      handleFileDrop(files[0].path);
+    }
+  });
+}
+
+async function handleBrowse() {
+  await window.easyTTS.openFile();
+}
+
+async function handleFileDrop(filePath) {
+  await window.easyTTS.openFilePath(filePath);
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// UI BUTTONS
+// ═════════════════════════════════════════════════════════════════════════════
+
+function setupButtons() {
+  // Play / Pause
+  els.btnPlay.addEventListener('click', handlePlay);
+
+  // Stop
+  els.btnStop.addEventListener('click', handleStop);
+
+  // Export
+  els.btnExport.addEventListener('click', handleExport);
+
+  // Settings
+  els.btnSettings.addEventListener('click', () => openModal());
+
+  // Speed
+  els.speedSlider.addEventListener('input', () => {
+    state.speed = parseFloat(els.speedSlider.value);
+    els.speedValue.textContent = state.speed.toFixed(1) + '×';
+    saveSetting('tts-speed', state.speed);
+  });
+
+  // Voice
+  els.voiceSelect.addEventListener('change', () => {
+    state.voice = els.voiceSelect.value;
+    saveSetting('tts-voice', state.voice);
+  });
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// KEYBOARD SHORTCUTS
+// ═════════════════════════════════════════════════════════════════════════════
+
+function setupKeyboardShortcuts() {
+  document.addEventListener('keydown', (e) => {
+    // Space for play/pause (only when not typing in contenteditable)
+    if (e.code === 'Space' && !e.target.isContentEditable && e.target.tagName !== 'INPUT' && e.target.tagName !== 'SELECT') {
+      e.preventDefault();
+      handlePlay();
+    }
+    // Escape to stop
+    if (e.code === 'Escape') {
+      handleStop();
+    }
+  });
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// IPC EVENTS (from main process)
+// ═════════════════════════════════════════════════════════════════════════════
+
+function setupEvents() {
+  window.easyTTS.onFileLoaded((data) => {
+    state.currentText = data.text;
+    state.currentFile = data.fileName;
+    els.fileLabel.textContent = data.fileName;
+    els.docTitle.textContent = data.title || data.fileName;
+    els.docMeta.textContent = data.pages ? `${data.pages} pages · ${data.text.length.toLocaleString()} chars` : `${data.text.length.toLocaleString()} chars`;
+    els.textDisplay.textContent = data.text;
+
+    // Hide drop zone, show text + controls
+    els.dropZone.classList.add('hidden');
+    els.textSection.classList.remove('hidden');
+    els.loadingBar.classList.add('hidden');
+    els.controls.classList.remove('hidden');
+
+    // Reset playback
+    resetPlayback();
+    showStatus(`Loaded: ${data.fileName} (${data.text.length.toLocaleString()} chars)`);
+  });
+
+  window.easyTTS.onLoadingStart((fileName) => {
+    els.loadingBar.classList.remove('hidden');
+    els.loadingText.textContent = `Loading ${fileName}…`;
+  });
+
+  window.easyTTS.onLoadingError((msg) => {
+    els.loadingBar.classList.add('hidden');
+    showStatus(`⚠️ ${msg}`);
+  });
+
+  // System TTS progress events
+  window.easyTTS.onSystemPlaying((data) => {
+    updateProgressSystem(data.current, data.total);
+  });
+  window.easyTTS.onSystemDone(() => {
+    finishPlayback();
+    showStatus('✅ Done');
+  });
+
+  // Menu accelerator handlers
+  window.easyTTS.onTriggerPlay(() => handlePlay());
+  window.easyTTS.onTriggerPause(() => handlePause());
+  window.easyTTS.onTriggerStop(() => handleStop());
+  window.easyTTS.onTriggerSpeedUp(() => adjustSpeed(0.1));
+  window.easyTTS.onTriggerSpeedDown(() => adjustSpeed(-0.1));
+  window.easyTTS.onTriggerExport(() => handleExport());
+}
+
+function adjustSpeed(delta) {
+  state.speed = Math.max(0.5, Math.min(2.0, state.speed + delta));
+  els.speedSlider.value = state.speed;
+  els.speedValue.textContent = state.speed.toFixed(1) + '×';
+  saveSetting('tts-speed', state.speed);
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// PLAYBACK
+// ═════════════════════════════════════════════════════════════════════════════
+
+async function handlePlay() {
+  if (state.isPaused) {
+    resumePlayback();
     return;
   }
 
-  try {
-    speakBtn.disabled = true;
-    showStatus('Processing...', 'info');
+  if (state.isPlaying) {
+    pausePlayback();
+    return;
+  }
 
-    let processedText = text;
+  const text = state.currentText;
+  if (!text || !text.trim()) {
+    showStatus('⚠️ No text to speak. Open a PDF first.');
+    return;
+  }
 
-    // Enhance with AI if enabled
-    if (aiEnhanceCheckbox.checked) {
-      showStatus('Enhancing with AI...', 'info');
-      processedText = await ttsService.enhanceTextWithAI(text);
+  const provider = state.provider;
+
+  // ── System TTS: play directly through macOS speakers ────────────────
+  if (provider === 'system') {
+    setPlaying(true);
+    els.btnPlay.textContent = '⏸ Play';
+    els.btnStop.disabled = false;
+    els.btnExport.disabled = true;
+    els.progress.classList.remove('hidden');
+    showStatus('🔊 Speaking…');
+
+    try {
+      const result = await window.easyTTS.speakText({ text, voice: state.voice, speed: state.speed });
+      if (!result.success) throw new Error(result.error);
+      updateProgressSystem(1, result.totalChunks);
+    } catch (error) {
+      showStatus(`⚠️ ${error.message}`);
+      finishPlayback();
     }
+    return;
+  }
 
-    // Convert to speech
-    const options = {
-      speed: parseFloat(speedSlider.value),
-      pitch: parseFloat(pitchSlider.value),
-      volume: parseFloat(volumeSlider.value),
-      language: languageSelect.value
-    };
+  // ── Kokoro / OpenAI: generate audio chunks, play in renderer ────────
+  if (provider === 'openai') {
+    const apiKey = await window.easyTTS.getSetting('openai-api-key');
+    if (!apiKey) {
+      openModal();
+      showStatus('🔑 Set your OpenAI API key in Settings');
+      return;
+    }
+  }
 
-    await ttsService.textToSpeech(processedText, options);
-    showStatus('Speaking...', 'success');
-    updateCacheInfo();
+  setPlaying(true);
+  els.btnPlay.textContent = '⏸ Pause';
+  els.btnStop.disabled = false;
+  showStatus('🔊 Generating speech…');
+  els.progress.classList.remove('hidden');
+
+  try {
+    const result = await window.easyTTS.speakText({ text, voice: state.voice, speed: state.speed });
+
+    if (!result.success) throw new Error(result.error);
+
+    // 'direct' mode = system TTS (handled above via events)
+    if (result.mode === 'direct') return;
+
+    state.audioChunks = result.chunks;
+    state.currentChunk = 0;
+
+    if (state.audioChunks.length === 0) throw new Error('No audio was generated');
+
+    const detectedInfo = result.detectedLanguage
+      ? ` [${result.detectedLanguage}]`
+      : '';
+    showStatus(`🔊 Speaking${detectedInfo} (${state.audioChunks.length} part${state.audioChunks.length > 1 ? 's' : ''})…`);
+    await playChunks();
+
   } catch (error) {
-    showStatus(`Error: ${error.message}`, 'error');
-  } finally {
-    speakBtn.disabled = false;
+    showStatus(`⚠️ ${error.message}`);
+    finishPlayback();
   }
 }
 
-// Handle stop
-function handleStop() {
-  if (speechSynthesis.speaking) {
-    speechSynthesis.cancel();
-    showStatus('Stopped', 'info');
+async function playChunks() {
+  if (state.currentChunk >= state.audioChunks.length) {
+    // Done
+    finishPlayback();
+    return;
+  }
+
+  updateProgress();
+
+  const chunk = state.audioChunks[state.currentChunk];
+  const audio = new Audio(chunk.data);
+  audio.playbackRate = state.speed;
+
+  // When this chunk finishes, play next
+  audio.onended = () => {
+    if (!state.isPlaying) return; // was stopped
+    state.currentChunk++;
+    playChunks();
+  };
+
+  audio.onerror = () => {
+    showStatus('⚠️ Audio playback error');
+    setPlaying(false);
+  };
+
+  // Store reference for pause/stop
+  state.currentAudio = audio;
+
+  // Wait for it to actually play
+  try {
+    await audio.play();
+    state.isPaused = false;
+    state.isPlaying = true;
+  } catch (err) {
+    if (err.name !== 'AbortError') {
+      showStatus(`⚠️ Playback failed: ${err.message}`);
+      setPlaying(false);
+    }
   }
 }
 
-// Handle export audio
+function pausePlayback() {
+  if (state.currentAudio) {
+    state.currentAudio.pause();
+    state.isPaused = true;
+    state.isPlaying = true;
+    els.btnPlay.textContent = '▶ Resume';
+    showStatus('⏸ Paused');
+  }
+}
+
+function resumePlayback() {
+  if (state.currentAudio && state.isPaused) {
+    state.currentAudio.play()
+      .then(() => {
+        state.isPaused = false;
+        els.btnPlay.textContent = '⏸ Pause';
+        showStatus('🔊 Speaking…');
+      })
+      .catch(err => showStatus(`⚠️ ${err.message}`));
+  }
+}
+
+async function handleStop() {
+  // Stop Audio element playback
+  if (state.currentAudio) {
+    state.currentAudio.pause();
+    state.currentAudio = null;
+  }
+
+  // Signal main process to stop (kills say process or aborts OpenAI request)
+  await window.easyTTS.stopSpeaking();
+
+  finishPlayback();
+}
+
+function finishPlayback() {
+  setPlaying(false);
+  state.isPaused = false;
+  state.currentChunk = 0;
+  state.currentAudio = null;
+  els.btnPlay.textContent = '▶ Play';
+  els.btnStop.disabled = true;
+  els.btnExport.disabled = false;
+  els.progress.classList.add('hidden');
+  // Don't overwrite status if there's already an error/status message
+  if (els.statusText.textContent.includes('⚠️') || els.statusText.textContent.includes('✅ Done')) {
+    // keep it
+  } else {
+    showStatus('✅ Done');
+  }
+}
+
+function resetPlayback() {
+  if (state.currentAudio) {
+    state.currentAudio.pause();
+    state.currentAudio = null;
+  }
+  setPlaying(false);
+  state.isPaused = false;
+  state.isPlaying = false;
+  state.currentChunk = 0;
+  state.audioChunks = [];
+  els.btnPlay.textContent = '▶ Play';
+  els.btnStop.disabled = true;
+  els.btnExport.disabled = true;
+  els.progress.classList.add('hidden');
+}
+
+function setPlaying(val) {
+  state.isPlaying = val;
+}
+
+function updateProgress() {
+  const total = state.audioChunks.length || 1;
+  const current = state.currentChunk + 1;
+  const pct = Math.round((current / total) * 100);
+  els.progressFill.style.width = pct + '%';
+  els.progressText.textContent = `${current} / ${total}`;
+}
+
+function updateProgressSystem(current, total) {
+  const pct = Math.round((current / total) * 100);
+  els.progressFill.style.width = pct + '%';
+  els.progressText.textContent = `${current} / ${total}`;
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// EXPORT
+// ═════════════════════════════════════════════════════════════════════════════
+
 async function handleExport() {
-  const text = textInput.value.trim();
-  if (!text) {
-    showStatus('Please enter some text to export', 'error');
+  if (state.audioChunks.length === 0) {
+    showStatus('⚠️ No audio to export. Play something first.');
     return;
   }
 
-  try {
-    const result = await window.electronFS.saveFile({
-      title: 'Export Audio',
-      defaultPath: 'speech.mp3',
-      filters: [
-        { name: 'Audio Files', extensions: ['mp3', 'wav'] }
-      ]
-    });
+  // Concatenate all chunks into one data URL
+  // For now, export the first chunk (full solution would merge MP3s)
+  const firstChunk = state.audioChunks[0];
+  if (!firstChunk) return;
 
-    if (!result.canceled && result.filePath) {
-      showStatus('Audio export functionality requires additional setup', 'warning');
-      // In production, you would implement actual audio export here
-      // This requires additional dependencies like 'text-to-speech' npm package
-    }
-  } catch (error) {
-    showStatus(`Export failed: ${error.message}`, 'error');
+  showStatus('💾 Exporting…');
+
+  const result = await window.easyTTS.exportAudio(firstChunk.data);
+
+  if (result.success) {
+    showStatus(`✅ Exported to ${result.filePath}`);
+  } else if (result.error) {
+    showStatus(`⚠️ Export failed: ${result.error}`);
   }
 }
 
-// Handle clear cache
-function handleClearCache() {
-  ttsService.clearCache();
-  updateCacheInfo();
-  showStatus('Cache cleared', 'success');
+// ═════════════════════════════════════════════════════════════════════════════
+// STATUS
+// ═════════════════════════════════════════════════════════════════════════════
+
+function showStatus(msg) {
+  els.statusText.textContent = msg;
+  els.status.classList.remove('hidden');
 }
 
-// Handle open text file
-async function handleOpenText() {
-  // This is handled by the main process menu
-  // File loading happens via IPC
-}
+// ═════════════════════════════════════════════════════════════════════════════
+// SETTINGS MODAL
+// ═════════════════════════════════════════════════════════════════════════════
 
-// Handle open image file
-async function handleOpenImage() {
-  // This is handled by the main process menu
-  // Image selection happens via IPC
-}
+async function openModal() {
+  const providers = await window.easyTTS.getProviders();
+  const currentProvider = await window.easyTTS.getSetting('tts-provider') || 'kokoro';
+  const apiKey = await window.easyTTS.getSetting('openai-api-key') || '';
 
-// Handle OCR
-async function handleOCR(imagePath) {
-  try {
-    showStatus('Performing OCR...', 'info');
+  // Populate provider dropdown
+  els.providerSelect.innerHTML = Object.entries(providers).map(([key, p]) =>
+    `<option value="${key}" ${key === currentProvider ? 'selected' : ''}>
+      ${p.name} (${p.pricing})
+    </option>`
+  ).join('');
 
-    const result = await window.electronOCR.performOCR(imagePath);
+  // Show pricing info
+  const selectedProvider = providers[currentProvider];
+  if (selectedProvider) {
+    els.providerPricing.textContent = selectedProvider.pricing;
+  }
 
-    if (result.success) {
-      textInput.value = result.text;
-      updateTextStats();
-      showStatus('OCR completed successfully', 'success');
+  // Show/hide fields based on provider
+  const showOpenAi = currentProvider === 'openai';
+  els.apiKeyInput.value = apiKey;
+  els.apiKeyGroup.classList.toggle('hidden', !showOpenAi);
+  els.modelGroup.classList.toggle('hidden', !showOpenAi);
+
+  // Provider change
+  els.providerSelect.onchange = () => {
+    const prov = els.providerSelect.value;
+    const isOpenAi = prov === 'openai';
+    els.apiKeyGroup.classList.toggle('hidden', !isOpenAi);
+    els.modelGroup.classList.toggle('hidden', !isOpenAi);
+    if (providers[prov]) {
+      els.providerPricing.textContent = providers[prov].pricing;
+    }
+  };
+
+  // Validate API key
+  els.btnValidateKey.onclick = async () => {
+    const key = els.apiKeyInput.value.trim();
+    if (!key) {
+      els.apiKeyStatus.textContent = 'Please enter an API key';
+      els.apiKeyStatus.style.color = 'var(--accent)';
+      return;
+    }
+
+    els.btnValidateKey.disabled = true;
+    els.btnValidateKey.textContent = 'Checking…';
+    els.apiKeyStatus.textContent = '';
+
+    const result = await window.easyTTS.validateApiKey(key);
+    if (result.valid) {
+      els.apiKeyStatus.textContent = '✅ Key is valid';
+      els.apiKeyStatus.style.color = '#4ade80';
     } else {
-      showStatus(result.error, 'error');
+      els.apiKeyStatus.textContent = result.error || '❌ Invalid key';
+      els.apiKeyStatus.style.color = 'var(--accent)';
     }
-  } catch (error) {
-    showStatus(`OCR failed: ${error.message}`, 'error');
+
+    els.btnValidateKey.disabled = false;
+    els.btnValidateKey.textContent = 'Validate';
+  };
+
+  // OpenAI link
+  els.openaiLink.onclick = (e) => {
+    e.preventDefault();
+    // In Electron we can use shell.openExternal, but from renderer we just send the URL
+    window.open('https://platform.openai.com/api-keys', '_blank');
+  };
+
+  els.settingsModal.classList.remove('hidden');
+}
+
+function closeModal() {
+  els.settingsModal.classList.add('hidden');
+}
+
+async function populateVoices(provider) {
+  const providers = await window.easyTTS.getProviders();
+  let voiceList = [];
+
+  if (provider === 'kokoro' && providers.kokoro) {
+    voiceList = providers.kokoro.voices;
+  } else if (provider === 'openai' && providers.openai) {
+    voiceList = providers.openai.voices;
+  } else if (provider === 'system' && state.systemVoices.length > 0) {
+    voiceList = state.systemVoices;
+  }
+
+  if (voiceList.length === 0) return;
+
+  const current = state.voice;
+  const isValid = voiceList.includes(current);
+  els.voiceSelect.innerHTML = voiceList.map(v =>
+    `<option value="${v}" ${v === current ? 'selected' : ''}>${v}</option>`
+  ).join('');
+
+  if (!isValid) {
+    state.voice = voiceList[0];
+    els.voiceSelect.value = state.voice;
+    await saveSetting('tts-voice', state.voice);
   }
 }
 
-// Handle add batch files
-async function handleAddBatch() {
-  try {
-    const result = await window.electronFS.selectFile({
-      properties: ['openFile', 'multiSelections'],
-      filters: [
-        { name: 'Text Files', extensions: ['txt', 'md', 'rtf'] },
-        { name: 'All Files', extensions: ['*'] }
-      ]
-    });
+async function saveModalSettings() {
+  const provider = els.providerSelect.value;
+  const apiKey = els.apiKeyInput.value.trim();
 
-    if (!result.canceled && result.filePaths.length > 0) {
-      batchFiles.push(...result.filePaths);
-      updateBatchList();
-      processBatchBtn.disabled = false;
-      showStatus(`Added ${result.filePaths.length} file(s)`, 'success');
-    }
-  } catch (error) {
-    showStatus(`Failed to add files: ${error.message}`, 'error');
+  state.provider = provider;
+  await saveSetting('tts-provider', provider);
+
+  if (provider === 'openai') {
+    await saveSetting('tts-model', els.modelSelect.value);
+    if (apiKey) await saveSetting('openai-api-key', apiKey);
   }
+
+  // Update voice dropdown to match the new provider
+  await populateVoices(provider);
+
+  closeModal();
+  showStatus('Settings saved');
+  checkApiKey();
 }
 
-// Update batch list UI
-function updateBatchList() {
-  batchList.innerHTML = '';
-  if (batchFiles.length === 0) {
-    batchList.innerHTML = '<div style="color: #999; text-align: center;">No files added</div>';
-    return;
-  }
+function setupModal() {
+  els.modalClose.addEventListener('click', closeModal);
+  els.modalDone.addEventListener('click', saveModalSettings);
+  els.modalBackdrop.addEventListener('click', closeModal);
 
-  batchFiles.forEach((file, index) => {
-    const item = document.createElement('div');
-    item.className = 'batch-item';
-    item.textContent = file;
-    batchList.appendChild(item);
+  // Enter key to save
+  els.apiKeyInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') saveModalSettings();
   });
 }
 
-// Handle process batch
-async function handleProcessBatch() {
-  if (batchFiles.length === 0) return;
+// ═════════════════════════════════════════════════════════════════════════════
+// GO
+// ═════════════════════════════════════════════════════════════════════════════
 
-  try {
-    processBatchBtn.disabled = true;
-    showStatus('Processing batch...', 'info');
-
-    const texts = [];
-    for (const filePath of batchFiles) {
-      const result = await window.electronFS.readFile(filePath);
-      if (result.success) {
-        texts.push(result.content);
-      }
-    }
-
-    const options = {
-      speed: parseFloat(speedSlider.value),
-      pitch: parseFloat(pitchSlider.value),
-      volume: parseFloat(volumeSlider.value),
-      language: languageSelect.value
-    };
-
-    const results = await ttsService.batchProcess(texts, options);
-    const successCount = results.filter(r => r.success).length;
-
-    showStatus(`Batch processed: ${successCount}/${results.length} succeeded`, 'success');
-    updateCacheInfo();
-
-    // Clear batch
-    batchFiles = [];
-    updateBatchList();
-  } catch (error) {
-    showStatus(`Batch processing failed: ${error.message}`, 'error');
-  } finally {
-    processBatchBtn.disabled = true;
-  }
-}
-
-// Initialize on load
-init();
+document.addEventListener('DOMContentLoaded', init);
