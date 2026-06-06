@@ -1,66 +1,146 @@
 # Easy TTS Reader 🐚
 
-A clean, AI-powered **PDF-to-Audio** reader. Drop a PDF, hear it read aloud in natural-sounding voices.
+A clean, AI-powered **PDF-to-Audio** reader. Drop a PDF, hear it read aloud in natural-sounding voices — fully local and free.
 
-Built with Electron + OpenAI TTS (or free macOS system TTS).
+![screenshot](https://img.shields.io/badge/status-active-brightgreen)
+![license](https://img.shields.io/badge/license-MIT-blue)
+
+---
 
 ## Quick Start
 
 ```bash
+# Install Node.js dependencies
 npm install
+
+# Launch the desktop app
 npm start
 ```
 
 Then:
-1. Click **⚙️ Settings** → paste your [OpenAI API key](https://platform.openai.com/api-keys)
-2. Drop a PDF or click to browse
-3. Click **▶ Play**
+1. **Drop a PDF** (or click to browse) — text is extracted automatically
+2. Click **▶ Play** — Kokoro-82M generates speech locally, and the language is auto-detected
+3. Adjust **Speed** and **Voice** to your preference
+
+No API key needed. No subscriptions. No internet required after first model download.
+
+---
 
 ## Features
 
-- 📄 **PDF text extraction** — drag-drop any PDF, get clean readable text
-- 🎙️ **Natural-sounding TTS** — OpenAI tts-1/tts-1-hd with 6 voices (more coming)
-- ⚡ **Speed control** — 0.5× to 2.0× playback speed
-- 💾 **Export audio** — save speech as MP3
-- 🚫 **No subscriptions** — pay-as-you-go OpenAI ($15 per million chars ≈ $0.75 per research paper)
-- 🔑 **Offline option** — macOS system TTS (free, no API key needed)
-
-## Tech Stack
-
-| Layer | Choice |
+| Feature | Details |
 |---|---|
-| Desktop | Electron |
-| PDF parsing | pdf-parse |
-| TTS (primary) | OpenAI tts-1 / tts-1-hd |
-| TTS (fallback) | macOS `say` command |
-| Persistence | electron-store |
-| HTTP | axios |
+| 📄 **PDF support** | Extract text from any PDF (also .txt, .md). Handles 100+ page documents |
+| 🌍 **Language auto-detect** | Automatically detects the PDF language and picks the right Kokoro voice (9 languages) |
+| 🗣️ **Kokoro-82M (local)** | Free, open-weight TTS with 54 voices across 9 languages. Runs entirely on your machine |
+| 🎙️ **OpenAI TTS** | Optional cloud TTS — 6 voices, higher quality, $0.75 per typical paper |
+| 🔊 **System TTS** | macOS fallback — free, offline, basic quality |
+| ⏱️ **Speed control** | 0.5× to 2.0× playback speed |
+| 💾 **Export audio** | Save generated speech as an audio file |
+| 🔒 **Private** | Kokoro runs 100% locally. Your documents never leave your computer |
+| 🚫 **No signup** | No accounts, no subscriptions, no tracking |
+
+---
+
+## TTS Engines
+
+### 🥇 Kokoro-82M (Local) — Default
+
+[Kokoro](https://huggingface.co/hexgrad/Kokoro-82M) is an open-weight TTS model with **82 million parameters**. Despite its small size, it delivers quality comparable to much larger models. Apache 2.0 licensed.
+
+**54 voices** across **9 languages**:
+
+| Language | Code | Example Voices |
+|---|---|---|
+| American English | `a` | `af_bella` (🔥), `af_heart` (❤️), `am_adam`, `am_onyx` |
+| British English | `b` | `bf_alice`, `bf_isabella`, `bm_george`, `bm_daniel` |
+| Japanese | `j` | `jf_alpha`, `jf_gongitsune`, `jm_kumo` |
+| Spanish | `e` | `ef_dora`, `em_alex`, `em_santa` |
+| French | `f` | `ff_siwis` |
+| Hindi | `h` | `hf_alpha`, `hf_beta`, `hm_omega` |
+| Italian | `i` | `if_sara`, `im_nicola` |
+| Brazilian Portuguese | `p` | `pf_dora`, `pm_alex`, `pm_santa` |
+| Chinese (Mandarin) | `z` | `zf_xiaobei`, `zf_xiaoyi`, `zm_yunxi` |
+
+**Voice naming:** `{language}{gender}_{name}` — e.g., `af_bella` = American English, female, Bella.
+
+**Pricing:** Free (local). ~$0.06 per hour of audio (electricity cost).
+
+### 🥈 OpenAI TTS (Cloud)
+
+OpenAI's `tts-1` / `tts-1-hd` models — 6 voices, 57 languages, simple API.
+
+**Pricing:** $15 per million characters (~$0.75 per research paper). Requires an API key.
+
+### 🥉 System TTS (macOS)
+
+Your Mac's built-in speech synthesizer (`say` command). Works offline, no setup.
+
+**Pricing:** Free.
+
+---
+
+## TTS API Pricing Reference
+
+| Provider | Price/1M chars | Quality | Voices | Languages | Needs Key? |
+|---|---|---|---|---|---|
+| **Kokoro-82M** (local) | **Free** | High | 54 | 9 | ❌ |
+| **macOS System** | Free | Basic | 143 | Many | ❌ |
+| **OpenAI tts-1** | $15 | High | 6 | 57 | ✅ |
+| **Google Neural2** | $16 | High | 200+ | 40+ | ✅ |
+| **Amazon Polly Neural** | $16 | Medium | 60+ | 30+ | ✅ |
+| **ElevenLabs** | ~$165 | Highest | 1000+ | 32 | ✅ |
+
+---
 
 ## Architecture
 
 ```
-desktop/
-├── main.js              # Electron main process
-├── preload.js           # Secure IPC bridge
-├── services/
-│   ├── pdf-service.js   # PDF text extraction + chunking
-│   └── tts-service.js   # TTS API calls (OpenAI + system)
-└── renderer/
-    ├── index.html       # UI
-    ├── styles.css       # Styling (dark theme)
-    └── app.js           # UI logic
+Easy-TTS-Reader/
+├── package.json              # Node.js + Electron deps
+├── .kokoro-venv/             # Python venv (Python 3.12) for Kokoro
+├── desktop/
+│   ├── main.js               # Electron main process (IPC handlers, menus)
+│   ├── preload.js            # Secure bridge (renderer ↔ main)
+│   ├── services/
+│   │   ├── pdf-service.js    # PDF text extraction (pdf-parse)
+│   │   ├── tts-service.js    # TTS API integration (all providers)
+│   │   └── kokoro_tts.py     # Kokoro-82M Python wrapper (lang detect, generation)
+│   └── renderer/
+│       ├── index.html         # Dark-themed UI
+│       ├── styles.css         # Styling
+│       └── app.js             # Renderer logic
+└── README.md
 ```
 
-## TTS Pricing
+### Data Flow
 
-See [TTS API comparison](https://docs.google.com/spreadsheets/d/...) or check the `docs/` folder.
+```
+PDF ──→ pdf-parse ──→ text ──→ kokoro_tts.py ──→ WAV audio ──→ Playback
+                ↑                    ↑
+          language detection    Kokoro-82M model
+          (langdetect)          (local, 82M params)
+```
 
-| Provider | Price/1M chars | Quality | Voices | Needs Key? |
-|---|---|---|---|---|
-| OpenAI tts-1 | $15 | High | 6 | Yes |
-| macOS `say` | Free | Basic | Many | No |
+---
 
-A typical 20-page research paper (~50K chars) costs **~$0.75** with OpenAI TTS.
+## Privacy
+
+- **Kokoro** and **System TTS** run 100% locally. Nothing leaves your machine.
+- **OpenAI TTS** sends text to OpenAI's servers (requires API key, data subject to OpenAI's policy).
+- All settings are stored locally via `electron-store`.
+
+---
+
+## Future Plans
+
+- **Streaming playback** — start hearing audio while generation is still in progress
+- **MP3 export** — concatenate and compress all audio chunks
+- **More local models** — Piper, XTTS, Bark
+- **Chapter markers** — for long audiobooks
+- **EPUB support** — natively read ebook formats
+
+---
 
 ## License
 
