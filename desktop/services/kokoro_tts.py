@@ -89,6 +89,16 @@ def resolve_language(iso_code: str, requested_voice: str):
     return 'a', 'af_bella'
 
 
+def get_device() -> str:
+    """Pick the best available torch device: cuda > mps > cpu."""
+    import torch
+    if torch.cuda.is_available():
+        return 'cuda'
+    if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+        return 'mps'
+    return 'cpu'
+
+
 def check_lang_support(lang_code: str) -> bool:
     """Test if the Kokoro language G2P module can be loaded (cached)."""
     if not hasattr(check_lang_support, 'cache'):
@@ -155,7 +165,8 @@ def main():
         sys.exit(1)
 
     try:
-        pipeline = KPipeline(lang_code=lang_code, repo_id='hexgrad/Kokoro-82M')
+        device = get_device()
+        pipeline = KPipeline(lang_code=lang_code, repo_id='hexgrad/Kokoro-82M', device=device)
 
         # ── Generate audio and concatenate ─────────────────────────────
         all_audio = []

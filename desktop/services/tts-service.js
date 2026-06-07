@@ -136,7 +136,11 @@ class TtsService {
     // Suppress Python stderr (torch warnings) — pipe to /dev/null
     const child = spawn(pythonBin, ['-u', '-W', 'ignore', scriptPath], {
       stdio: ['pipe', 'pipe', 'ignore'],
-      env: { ...process.env, PYTHONUNBUFFERED: '1' }
+      env: {
+        ...process.env,
+        PYTHONUNBUFFERED: '1',
+        PYTORCH_ENABLE_MPS_FALLBACK: '1'  // Enable Apple Silicon GPU (MPS)
+      }
     });
     this.activeKokoroProcess = child;
 
