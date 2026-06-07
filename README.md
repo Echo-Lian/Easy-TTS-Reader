@@ -93,11 +93,62 @@ Your Mac's built-in speech synthesizer (`say` command). Works offline, no setup.
 
 ---
 
+## Batch CLI (Batch PDF-to-Audio)
+
+For users who prefer the command line or want to convert many PDFs at once (e.g., an audiobook by chapters), use the batch converter script.
+
+### Quick Start
+
+```bash
+# Convert all PDFs in a folder to WAV files
+node batch-convert.js ./path/to/pdfs ./path/to/output
+```
+
+### Usage
+
+```
+node batch-convert.js <input-dir> <output-dir> [options]
+```
+
+**Arguments**
+
+| Argument | Description |
+|---|---|
+| `input-dir` | Directory containing PDF files |
+| `output-dir` | Directory to save WAV audio files |
+
+**Options**
+
+| Option | Default | Description |
+|---|---|---|
+| `--voice <name>` | `af_nova` | Kokoro voice to use (see voice tables above) |
+| `--file <pattern>` | `*.pdf` | Convert only files matching this pattern |
+| `--list` | — | Preview matching files without converting |
+| `--help` | — | Show full help |
+
+### Examples
+
+```bash
+# Convert all PDFs with a British voice
+node batch-convert.js ./pdfs ./audio --voice bm_daniel
+
+# Convert specific chapters
+node batch-convert.js ./pdfs ./audio --file "chapter*.pdf"
+
+# Preview which files will be converted
+node batch-convert.js ./pdfs ./audio --list
+```
+
+Output files are saved as `.wav` (compatible with Apple Music, VLC, and all standard media players).
+
+---
+
 ## Architecture
 
 ```
 Easy-TTS-Reader/
 ├── package.json              # Node.js + Electron deps
+├── batch-convert.js          # CLI batch converter (Kokoro, no GUI needed)
 ├── .kokoro-venv/             # Python venv (Python 3.12) for Kokoro
 ├── desktop/
 │   ├── main.js               # Electron main process (IPC handlers, menus)
