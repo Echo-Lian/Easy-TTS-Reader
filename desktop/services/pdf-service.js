@@ -57,6 +57,37 @@ class PdfService {
   }
 
   /**
+   * Normalize text for TTS: remove mid-sentence line breaks so the
+   * speech engine doesn't pause at artificial line breaks from PDF layout.
+   *
+   * Rules:
+   *   1. Hyphenated line breaks (word-\nword) → joined without space
+   *   2. Multiple newlines (\n{2,}) → paragraph break (\n\n)
+   *   3. Remaining single newlines → space
+   *
+   * @param {string} text
+   * @returns {string}
+   */
+  normalizeForTTS(text) {
+    if (!text) return text;
+    let t = text;
+    // 1. Join hyphenated word breaks (word- followed by newline)
+    t = t.replace(/(\w+)-\n/g, '$1');
+    // 2. Protect paragraph breaks (\n{2,}) by replacing with a marker
+    //    (preserves paragraph separation for TTS)
+    t = t.replace(/\n{2,}/g, '\x00');
+    // 3. Replace remaining single \n with space
+    t = t.replace(/\n/g, ' ');
+    // 4. Restore paragraph breaks as double newline
+    t = t.replace(/\x00/g, '\n\n');
+    // 5. Collapse multiple spaces (from newline→space + existing spaces)
+    t = t.replace(/[ \t]+/g, ' ');
+    // 6. Trim
+    t = t.trim();
+    return t;
+  }
+
+  /**
    * Split extracted text into chunks at sentence boundaries
    * @param {string} text
    * @param {number} maxChars - Max chars per chunk (~3000 for OpenAI TTS limit)

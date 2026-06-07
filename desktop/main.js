@@ -220,11 +220,15 @@ ipcMain.handle('speak-text', async (_event, options) => {
     const { text, voice, speed } = options;
     if (!text || !text.trim()) throw new Error('No text to speak');
 
+    // Normalize text: remove mid-sentence line breaks from PDF layout
+    // so TTS doesn't pause at artificial line boundaries.
+    const normalizedText = pdfService.normalizeForTTS(text);
+
     const provider = store.get('tts-provider') || 'kokoro';
 
     // Kokoro: generate WAV chunks via Python (auto-detects language)
     if (provider === 'kokoro') {
-      const results = await ttsService.generateKokoroAudio(text, {
+      const results = await ttsService.generateKokoroAudio(normalizedText, {
         voice: voice || store.get('tts-voice'),
         speed: speed || store.get('tts-speed')
       });
@@ -235,7 +239,7 @@ ipcMain.handle('speak-text', async (_event, options) => {
 
     // OpenAI: generate MP3 chunks
     if (provider === 'openai') {
-      const results = await ttsService.generateOpenAIAudio(text, {
+      const results = await ttsService.generateOpenAIAudio(normalizedText, {
         apiKey: store.get('openai-api-key'),
         voice: voice || store.get('tts-voice'),
         model: 'tts-1',
@@ -248,7 +252,7 @@ ipcMain.handle('speak-text', async (_event, options) => {
     if (provider === 'system') {
       const PdfService = require('./services/pdf-service');
       const pdfService = new PdfService();
-      const chunks = text.length > 5000 ? pdfService.chunkText(text, 4000) : [text];
+      const chunks = normalizedText.length > 5000 ? pdfService.chunkText(normalizedText, 4000) : [normalizedText];
 
       // Fire chunks in background, send events
       playSystemChunks(chunks, { voice, speed });
@@ -311,15 +315,21 @@ ipcMain.handle('list-system-voices', async () => {
 
 // Export audio to file
 ipcMain.handle('export-audio', async (_event, audioDataUrl) => {
-  // Remove data URL prefix
+  // Detect actual format from data URL (WAV for Kokoro, MP3 for OpenAI)
+  const formatMatch = audioDataUrl.match(/^data:audio\/(\w+);base64,/);
+  const format = formatMatch ? formatMatch[1] : 'mp3';
   const base64Data = audioDataUrl.replace(/^data:audio\/\w+;base64,/, '');
   const buffer = Buffer.from(base64Data, 'base64');
 
+  const extMap = { wav: 'wav', mpeg: 'mp3', mp3: 'mp3', ogg: 'ogg', flac: 'flac' };
+  const ext = extMap[format] || 'mp3';
+  const label = ext.toUpperCase();
+
   const result = await dialog.showSaveDialog(mainWindow, {
     title: 'Export Audio',
-    defaultPath: 'speech.mp3',
+    defaultPath: `speech.${ext}`,
     filters: [
-      { name: 'MP3 Audio', extensions: ['mp3'] }
+      { name: `${label} Audio`, extensions: [ext] }
     ]
   });
 
